@@ -79,8 +79,9 @@ export function VoiceSheet({ onClose }: VoiceSheetProps) {
     setStatus("requesting");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
       if (!mountedRef.current) {
-        stream.getTracks().forEach((track) => track.stop());
+        stopStream();
         return;
       }
 
@@ -89,7 +90,6 @@ export function VoiceSheet({ onClose }: VoiceSheetProps) {
         ? new MediaRecorder(stream, { mimeType })
         : new MediaRecorder(stream);
 
-      streamRef.current = stream;
       recorderRef.current = recorder;
       chunksRef.current = [];
       recorder.ondataavailable = (event) => {
@@ -107,6 +107,7 @@ export function VoiceSheet({ onClose }: VoiceSheetProps) {
       setStatus("recording");
       timeoutRef.current = setTimeout(stopRecording, MAX_RECORDING_SECONDS * 1000);
     } catch (error) {
+      stopStream();
       if (!mountedRef.current) return;
       setStatus("error");
       setErrorMessage(messageForMicrophoneError(error));
