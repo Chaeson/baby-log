@@ -136,4 +136,26 @@ describe("VoiceSheet", () => {
     expect(fetch).not.toHaveBeenCalled();
     expect(stopTrack).toHaveBeenCalledOnce();
   });
+
+  it("stops the microphone if MediaRecorder initialization fails", async () => {
+    const user = userEvent.setup();
+    class BrokenMediaRecorder {
+      static isTypeSupported() {
+        return true;
+      }
+
+      constructor() {
+        throw new DOMException("Codec failure", "NotSupportedError");
+      }
+    }
+    vi.stubGlobal("MediaRecorder", BrokenMediaRecorder);
+    render(<VoiceSheet onClose={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: "녹음 시작" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "마이크를 시작하지 못했습니다",
+    );
+    expect(stopTrack).toHaveBeenCalledOnce();
+  });
 });
