@@ -1,0 +1,12 @@
+.DS_Store
+.idea/
+.swiftpm/
+.build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+backend/.gradle/
+backend/build/
+backend/out/
+backend/.env
+
