@@ -80,7 +80,8 @@ cd backend
 
 ```bash
 cd backend
-export OPENAI_API_KEY="YOUR_SERVER_SIDE_KEY"
+cp .env.example .env
+# .env의 OPENAI_API_KEY를 실제 서버용 키로 변경
 ./gradlew bootRun --args='--spring.profiles.active=local'
 ```
 
