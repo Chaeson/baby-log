@@ -45,7 +45,13 @@ export function VoiceSheet({ onClose }: VoiceSheetProps) {
       abortRef.current?.abort();
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       const recorder = recorderRef.current;
-      if (recorder?.state === "recording") recorder.stop();
+      if (recorder?.state === "recording") {
+        recorder.ondataavailable = null;
+        recorder.onstop = null;
+        recorder.onerror = null;
+        recorder.stop();
+      }
+      chunksRef.current = [];
       stopStream();
     };
   }, []);
