@@ -14,6 +14,7 @@ npm run dev
 ```bash
 npm run lint
 npm test
+npm run test:coverage
 npm run build
 ```
 
@@ -29,12 +30,24 @@ src/
 │   ├── components/            # 비교표, 아이 카드, 입력 sheet
 │   ├── mock-data.ts           # 현재 마일스톤의 유일한 mock 원천
 │   └── __tests__/             # 주요 사용자 동작 테스트
-└── lib/dashboard.ts           # 화면 타입과 순수 format utility
+└── lib/
+    ├── dashboard.ts           # 화면 타입과 순수 format utility
+    └── voice-api.ts           # Backend multipart transcription client
 ```
 
 App Router에서는 컴포넌트가 기본적으로 서버에서 렌더링됩니다. `dashboard/page.tsx`는 앞으로 Backend 초기 데이터를 읽을 서버 경계로 유지하고, `DashboardShell`에만 `"use client"`를 선언해 버튼, 타이머, localStorage 같은 브라우저 기능을 담당하게 했습니다.
 
 Dashboard의 `children` 배열이 아이 수를 결정하므로 단태아와 다태아를 같은 컴포넌트로 처리합니다. 비교표는 첫째와 둘째가 각 지표에서 항상 같은 열에 오도록 table semantics를 사용합니다.
+
+## 음성 녹음
+
+`VoiceSheet`는 사용자가 녹음 시작을 누른 뒤에만 마이크 권한을 요청합니다. Chrome 계열의 `webm/opus`와 Safari 계열의 `mp4`를 우선순위에 따라 선택하고 30초 후 자동 종료합니다. 녹음을 마치면 `voice-api.ts`가 Spring Backend에 multipart로 전송하고 인식 문장을 표시합니다.
+
+```bash
+cp .env.example .env.local
+```
+
+`NEXT_PUBLIC_API_BASE_URL`은 공개 가능한 Backend base URL일 뿐 비밀 값이 아닙니다. OpenAI API Key는 Web 환경 변수에 넣지 않습니다.
 
 ## 다음 연결 지점
 

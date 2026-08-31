@@ -28,6 +28,21 @@ describe("DashboardShell", () => {
     expect(screen.getByText("첫째 분유 120ml를 기록했어요")).toBeInTheDocument();
   });
 
+  it("validates and records a custom feeding amount", async () => {
+    const user = userEvent.setup();
+    render(<DashboardShell initialData={mockDashboard} />);
+
+    await user.click(screen.getByRole("button", { name: "둘째 분유 기록" }));
+    const saveButton = screen.getByRole("button", { name: "기록하기" });
+    expect(saveButton).toBeDisabled();
+
+    await user.type(screen.getByRole("textbox", { name: "직접 분유량 입력" }), "110");
+    expect(saveButton).toBeEnabled();
+    await user.click(saveButton);
+
+    expect(screen.getByRole("row", { name: "분유 620ml 690ml" })).toBeInTheDocument();
+  });
+
   it("records diaper and sleep actions on the selected child card", async () => {
     const user = userEvent.setup();
     render(<DashboardShell initialData={mockDashboard} />);
@@ -40,4 +55,3 @@ describe("DashboardShell", () => {
     expect(screen.getByText("둘째 수면을 시작했어요")).toBeInTheDocument();
   });
 });
-

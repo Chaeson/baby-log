@@ -50,13 +50,22 @@ Backend Controller는 검증된 DTO를 application service에 전달하고 Entit
 
 ## Voice와 AI 경계
 
-초기 Web은 음성 입력 UI와 연결 인터페이스만 제공합니다. 브라우저별 Web Speech API 차이에 제품 핵심을 의존하지 않고, 안정적인 경로는 다음처럼 설계합니다.
+음성 transcription은 구현되어 있습니다. 브라우저별 Web Speech API 차이에 제품 핵심을 의존하지 않고 `MediaRecorder`가 만든 파일을 Backend로 전송합니다.
 
 ```text
-Browser microphone → Backend upload → Speech-to-Text → structured parsing → Event 생성
+Browser microphone
+    → MediaRecorder (최대 30초)
+    → POST multipart audio
+    → VoiceTranscriptionService (형식/10MB 검증)
+    → SpeechToTextClient
+    → OpenAI /audio/transcriptions
+    → 인식 문장 표시
+    → [다음 단계] structured parsing → 사용자 확인 → Event 생성
 ```
 
-OpenAI API 키와 호출은 Backend에만 둡니다. AI는 DB에 직접 접근하지 않고 Backend가 필요한 데이터만 조회해 context로 전달합니다.
+녹음 파일은 애플리케이션 DB나 파일 시스템에 저장하지 않고 요청 중에만 메모리에서 검증·전달합니다. 사용자가 녹음 중 sheet를 닫으면 audio chunk를 폐기하고 업로드하지 않습니다.
+
+OpenAI API 키와 호출은 Backend에만 둡니다. API 키가 없으면 503, provider 호출 실패는 안전한 502 Problem Details로 변환하며 upstream 응답 본문을 사용자에게 노출하지 않습니다. AI는 DB에 직접 접근하지 않고 Backend가 필요한 데이터만 조회해 context로 전달합니다.
 
 ## 보존 중인 iOS
 

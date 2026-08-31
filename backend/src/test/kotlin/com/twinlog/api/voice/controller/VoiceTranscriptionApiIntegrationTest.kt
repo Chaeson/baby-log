@@ -13,6 +13,8 @@ import org.springframework.context.annotation.Primary
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.mock.web.MockMultipartFile
@@ -36,6 +38,17 @@ class VoiceTranscriptionApiIntegrationTest(
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.text").value("둘째 응가했어"))
             .andExpect(jsonPath("$.model").value("gpt-4o-mini-transcribe"))
+    }
+
+    @Test
+    fun `local web origin can call the voice API`() {
+        mockMvc.perform(
+            options("/api/v1/voice/transcriptions")
+                .header("Origin", "http://127.0.0.1:3000")
+                .header("Access-Control-Request-Method", "POST"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(header().string("Access-Control-Allow-Origin", "http://127.0.0.1:3000"))
     }
 }
 
