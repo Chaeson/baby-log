@@ -10,6 +10,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
@@ -20,7 +21,7 @@ import org.springframework.mock.web.MockMultipartFile
 @AutoConfigureMockMvc
 @Import(VoiceTranscriptionApiTestConfiguration::class)
 class VoiceTranscriptionApiIntegrationTest(
-    private val mockMvc: MockMvc,
+    @Autowired private val mockMvc: MockMvc,
 ) {
     @Test
     fun `browser recording can be transcribed`() {

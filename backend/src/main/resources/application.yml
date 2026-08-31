@@ -14,8 +14,21 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
+
+twinlog:
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+    base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
+    transcription-model: ${OPENAI_TRANSCRIPTION_MODEL:gpt-4o-mini-transcribe}
+  voice:
+    max-audio-bytes: ${VOICE_MAX_AUDIO_BYTES:10485760}
+  web:
+    allowed-origins: ${WEB_ALLOWED_ORIGINS:http://127.0.0.1:3000,http://localhost:3000}
 
 server:
   port: ${SERVER_PORT:8080}
   address: ${SERVER_ADDRESS:0.0.0.0}
-

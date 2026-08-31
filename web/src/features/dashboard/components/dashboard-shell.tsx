@@ -221,10 +221,10 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
             </span>
             <span>
               <span className="block text-sm font-extrabold">음성으로 기록</span>
-              <span className="block text-[11px] text-surface/65">UI 미리보기 · 다음 단계 연결</span>
+              <span className="block text-[11px] text-surface/65">최대 30초 · Backend STT</span>
             </span>
           </span>
-          <span className="rounded-full bg-surface/10 px-2.5 py-1 text-[10px] font-bold">준비 중</span>
+          <span className="rounded-full bg-surface/10 px-2.5 py-1 text-[10px] font-bold">녹음</span>
         </button>
       </main>
 

@@ -12,6 +12,10 @@ class DomainConflictException(message: String) : RuntimeException(message)
 
 class InvalidRequestException(message: String) : RuntimeException(message)
 
+class ExternalServiceUnavailableException(message: String) : RuntimeException(message)
+
+class ExternalServiceException(message: String) : RuntimeException(message)
+
 @RestControllerAdvice
 class ApiExceptionHandler {
     @ExceptionHandler(ResourceNotFoundException::class)
@@ -25,6 +29,20 @@ class ApiExceptionHandler {
     @ExceptionHandler(InvalidRequestException::class)
     fun handleInvalidRequest(exception: InvalidRequestException): ProblemDetail =
         ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.message ?: "Invalid request")
+
+    @ExceptionHandler(ExternalServiceUnavailableException::class)
+    fun handleServiceUnavailable(exception: ExternalServiceUnavailableException): ProblemDetail =
+        ProblemDetail.forStatusAndDetail(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            exception.message ?: "External service is unavailable",
+        )
+
+    @ExceptionHandler(ExternalServiceException::class)
+    fun handleExternalService(exception: ExternalServiceException): ProblemDetail =
+        ProblemDetail.forStatusAndDetail(
+            HttpStatus.BAD_GATEWAY,
+            exception.message ?: "External service request failed",
+        )
 
     @ExceptionHandler(MethodArgumentNotValidException::class)
     fun handleValidation(exception: MethodArgumentNotValidException): ProblemDetail {

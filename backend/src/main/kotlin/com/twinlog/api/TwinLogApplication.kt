@@ -1,11 +1,13 @@
 package com.twinlog.api
 
 import org.springframework.boot.autoconfigure.SpringBootApplication
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan
 import org.springframework.boot.runApplication
 import org.springframework.context.annotation.Bean
 import java.time.Clock
 
 @SpringBootApplication
+@ConfigurationPropertiesScan
 class TwinLogApplication {
     @Bean
     fun clock(): Clock = Clock.systemUTC()
@@ -14,4 +16,3 @@ class TwinLogApplication {
 fun main(args: Array<String>) {
     runApplication<TwinLogApplication>(*args)
 }
-
