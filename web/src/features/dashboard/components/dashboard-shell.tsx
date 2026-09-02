@@ -186,7 +186,7 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
           </div>
           <div className="overflow-hidden rounded-[1.75rem] border border-white/70 bg-surface p-2 surface-shadow dark:border-white/5">
             <CurrentStatusSummary
-              children={children}
+              summaries={children}
               generatedAt={initialData.generatedAt}
             />
           </div>

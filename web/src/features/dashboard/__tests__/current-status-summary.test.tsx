@@ -35,7 +35,7 @@ const children: ChildDashboard[] = [
 
 describe("CurrentStatusSummary", () => {
   it("shows both twins' current care state without switching tabs", () => {
-    render(<CurrentStatusSummary children={children} generatedAt={generatedAt} />);
+    render(<CurrentStatusSummary summaries={children} generatedAt={generatedAt} />);
 
     expect(screen.getByRole("columnheader", { name: "첫째" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "둘째" })).toBeInTheDocument();

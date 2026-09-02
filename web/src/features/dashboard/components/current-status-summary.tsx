@@ -2,12 +2,12 @@ import type { ChildDashboard } from "@/lib/dashboard";
 import { formatRelativeTime, formatStatusDuration } from "@/lib/dashboard";
 
 type CurrentStatusSummaryProps = {
-  children: ChildDashboard[];
+  summaries: ChildDashboard[];
   generatedAt: string;
 };
 
 export function CurrentStatusSummary({
-  children,
+  summaries,
   generatedAt,
 }: CurrentStatusSummaryProps) {
   const rows = [
@@ -45,7 +45,7 @@ export function CurrentStatusSummary({
     <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <table
         className="w-full table-fixed border-separate border-spacing-0 text-sm"
-        style={{ minWidth: `${112 + children.length * 124}px` }}
+        style={{ minWidth: `${112 + summaries.length * 124}px` }}
       >
         <caption className="sr-only">아이별 현재 육아 상태</caption>
         <thead>
@@ -56,7 +56,7 @@ export function CurrentStatusSummary({
             >
               상태
             </th>
-            {children.map((child) => (
+            {summaries.map((child) => (
               <th
                 key={child.childId}
                 scope="col"
@@ -78,7 +78,7 @@ export function CurrentStatusSummary({
               >
                 {row.label}
               </th>
-              {children.map((child) => (
+              {summaries.map((child) => (
                 <td
                   key={child.childId}
                   className={`px-2 py-3.5 text-center text-xs font-bold leading-5 tabular-nums text-ink sm:text-sm ${
