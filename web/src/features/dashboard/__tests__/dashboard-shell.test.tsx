@@ -1,10 +1,18 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DashboardShell } from "@/features/dashboard/components/dashboard-shell";
 import { mockDashboard } from "@/features/dashboard/mock-data";
 
 describe("DashboardShell", () => {
+  beforeEach(() => {
+    vi.spyOn(Date, "now").mockReturnValue(Date.parse(mockDashboard.generatedAt));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("uses the five product navigation destinations", () => {
     render(<DashboardShell initialData={mockDashboard} />);
 
@@ -38,6 +46,11 @@ describe("DashboardShell", () => {
 
     expect(screen.queryByRole("heading", { name: "분유 얼마나 먹었나요?" })).not.toBeInTheDocument();
     expect(screen.getByRole("row", { name: "분유 740ml 580ml" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("row", {
+        name: "마지막 분유 방금 전 · 120ml 55분 전 · 90ml",
+      }),
+    ).toBeInTheDocument();
     expect(screen.getByText("첫째 분유 120ml를 기록했어요")).toBeInTheDocument();
   });
 
@@ -62,9 +75,15 @@ describe("DashboardShell", () => {
 
     await user.click(screen.getByRole("button", { name: "첫째 소변 기록" }));
     expect(screen.getByText("첫째 소변을 기록했어요")).toBeInTheDocument();
+    expect(
+      screen.getByRole("row", { name: "마지막 소변 방금 전 1시간 전" }),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "첫째 수면 시작 기록" }));
     expect(screen.getByRole("button", { name: "첫째 깨어남 기록" })).toBeInTheDocument();
     expect(screen.getByText("첫째 수면을 시작했어요")).toBeInTheDocument();
+    expect(
+      screen.getByRole("row", { name: "현재 수면 수면 중 0분 수면 중 42분" }),
+    ).toBeInTheDocument();
   });
 });
