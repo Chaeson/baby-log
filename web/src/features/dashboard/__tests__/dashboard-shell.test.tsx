@@ -5,6 +5,18 @@ import { DashboardShell } from "@/features/dashboard/components/dashboard-shell"
 import { mockDashboard } from "@/features/dashboard/mock-data";
 
 describe("DashboardShell", () => {
+  it("uses the five product navigation destinations", () => {
+    render(<DashboardShell initialData={mockDashboard} />);
+
+    const navigation = screen.getByRole("navigation", { name: "주요 메뉴" });
+    expect(navigation).toHaveTextContent("오늘");
+    expect(navigation).toHaveTextContent("기록");
+    expect(navigation).toHaveTextContent("인사이트");
+    expect(navigation).toHaveTextContent("AI");
+    expect(navigation).toHaveTextContent("설정");
+    expect(navigation).not.toHaveTextContent("아이");
+  });
+
   it("shows twins side by side in one comparison table", () => {
     render(<DashboardShell initialData={mockDashboard} />);
 
