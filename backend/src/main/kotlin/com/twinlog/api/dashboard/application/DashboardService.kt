@@ -82,6 +82,22 @@ class DashboardService(
             .groupBy { requireNotNull(it.child.id) }
         val sleepsByChild = sleepRepository.findAllOverlapping(familyId, from, to)
             .groupBy { requireNotNull(it.child.id) }
+        val latestFeedingByChild = feedingRepository.findLatestForFamilyAt(familyId, now)
+            .associateBy { requireNotNull(it.child.id) }
+        val latestPeeByChild = diaperRepository.findLatestForFamilyAndTypesAt(
+            familyId,
+            listOf(DiaperType.PEE, DiaperType.BOTH),
+            now,
+        ).associateBy { requireNotNull(it.child.id) }
+        val latestPoopByChild = diaperRepository.findLatestForFamilyAndTypesAt(
+            familyId,
+            listOf(DiaperType.POOP, DiaperType.BOTH),
+            now,
+        ).associateBy { requireNotNull(it.child.id) }
+        val openSleepByChild = sleepRepository.findOpenForFamilyAt(familyId, now)
+            .associateBy { requireNotNull(it.child.id) }
+        val latestEndedSleepByChild = sleepRepository.findLatestEndedForFamilyAt(familyId, now)
+            .associateBy { requireNotNull(it.child.id) }
 
         return TodayDashboardResponse(
             familyId = familyId,
@@ -105,45 +121,36 @@ class DashboardService(
                     peeCount = diapers.count { it.diaperType == DiaperType.PEE || it.diaperType == DiaperType.BOTH },
                     poopCount = diapers.count { it.diaperType == DiaperType.POOP || it.diaperType == DiaperType.BOTH },
                     sleepMinutes = sleepMinutes,
-                    currentState = currentState(childId, now),
+                    currentState = currentState(
+                        lastFeeding = latestFeedingByChild[childId]?.let {
+                            LastFeedingResponse(it.occurredAt, it.amountMl)
+                        },
+                        lastPeeAt = latestPeeByChild[childId]?.occurredAt,
+                        lastPoopAt = latestPoopByChild[childId]?.occurredAt,
+                        openSleepStartedAt = openSleepByChild[childId]?.startedAt,
+                        lastSleepEndedAt = latestEndedSleepByChild[childId]?.endedAt,
+                    ),
                 )
             },
         )
     }
 
-    private fun currentState(childId: UUID, now: Instant): ChildCurrentStateResponse {
-        val lastFeeding = feedingRepository
-            .findFirstByChild_IdAndOccurredAtLessThanEqualOrderByOccurredAtDescCreatedAtDesc(childId, now)
-        val lastPee = diaperRepository
-            .findFirstByChild_IdAndDiaperTypeInAndOccurredAtLessThanEqualOrderByOccurredAtDescCreatedAtDesc(
-                childId,
-                listOf(DiaperType.PEE, DiaperType.BOTH),
-                now,
-            )
-        val lastPoop = diaperRepository
-            .findFirstByChild_IdAndDiaperTypeInAndOccurredAtLessThanEqualOrderByOccurredAtDescCreatedAtDesc(
-                childId,
-                listOf(DiaperType.POOP, DiaperType.BOTH),
-                now,
-            )
-        val openSleep = sleepRepository
-            .findFirstByChild_IdAndEndedAtIsNullAndOccurredAtLessThanEqualOrderByOccurredAtDescCreatedAtDesc(childId, now)
-        val lastEndedSleep = if (openSleep == null) {
-            sleepRepository
-                .findFirstByChild_IdAndEndedAtIsNotNullAndEndedAtLessThanEqualOrderByEndedAtDescCreatedAtDesc(childId, now)
-        } else {
-            null
-        }
-
+    private fun currentState(
+        lastFeeding: LastFeedingResponse?,
+        lastPeeAt: Instant?,
+        lastPoopAt: Instant?,
+        openSleepStartedAt: Instant?,
+        lastSleepEndedAt: Instant?,
+    ): ChildCurrentStateResponse {
         return ChildCurrentStateResponse(
-            lastFeeding = lastFeeding?.let { LastFeedingResponse(it.occurredAt, it.amountMl) },
-            sleep = if (openSleep != null) {
-                CurrentSleepResponse(CurrentSleepStatus.SLEEPING, openSleep.startedAt)
+            lastFeeding = lastFeeding,
+            sleep = if (openSleepStartedAt != null) {
+                CurrentSleepResponse(CurrentSleepStatus.SLEEPING, openSleepStartedAt)
             } else {
-                CurrentSleepResponse(CurrentSleepStatus.AWAKE, lastEndedSleep?.endedAt)
+                CurrentSleepResponse(CurrentSleepStatus.AWAKE, lastSleepEndedAt)
             },
-            lastPeeAt = lastPee?.occurredAt,
-            lastPoopAt = lastPoop?.occurredAt,
+            lastPeeAt = lastPeeAt,
+            lastPoopAt = lastPoopAt,
         )
     }
 

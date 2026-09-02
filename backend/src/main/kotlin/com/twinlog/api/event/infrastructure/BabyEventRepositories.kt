@@ -11,10 +11,24 @@ import java.time.Instant
 import java.util.UUID
 
 interface FeedingEventJpaRepository : JpaRepository<FeedingEventEntity, UUID> {
-    fun findFirstByChild_IdAndOccurredAtLessThanEqualOrderByOccurredAtDescCreatedAtDesc(
-        childId: UUID,
-        occurredAt: Instant,
-    ): FeedingEventEntity?
+    @Query(
+        """
+        select e from FeedingEventEntity e join fetch e.child c
+        where c.family.id = :familyId and e.occurredAt <= :at
+          and not exists (
+            select newer.id from FeedingEventEntity newer
+            where newer.child.id = c.id and newer.occurredAt <= :at
+              and (
+                newer.occurredAt > e.occurredAt
+                or (newer.occurredAt = e.occurredAt and newer.createdAt > e.createdAt)
+              )
+          )
+        """,
+    )
+    fun findLatestForFamilyAt(
+        @Param("familyId") familyId: UUID,
+        @Param("at") at: Instant,
+    ): List<FeedingEventEntity>
 
     @Query(
         """
@@ -30,11 +44,25 @@ interface FeedingEventJpaRepository : JpaRepository<FeedingEventEntity, UUID> {
 }
 
 interface DiaperEventJpaRepository : JpaRepository<DiaperEventEntity, UUID> {
-    fun findFirstByChild_IdAndDiaperTypeInAndOccurredAtLessThanEqualOrderByOccurredAtDescCreatedAtDesc(
-        childId: UUID,
-        diaperTypes: Collection<DiaperType>,
-        occurredAt: Instant,
-    ): DiaperEventEntity?
+    @Query(
+        """
+        select e from DiaperEventEntity e join fetch e.child c
+        where c.family.id = :familyId and e.diaperType in :diaperTypes and e.occurredAt <= :at
+          and not exists (
+            select newer.id from DiaperEventEntity newer
+            where newer.child.id = c.id and newer.diaperType in :diaperTypes and newer.occurredAt <= :at
+              and (
+                newer.occurredAt > e.occurredAt
+                or (newer.occurredAt = e.occurredAt and newer.createdAt > e.createdAt)
+              )
+          )
+        """,
+    )
+    fun findLatestForFamilyAndTypesAt(
+        @Param("familyId") familyId: UUID,
+        @Param("diaperTypes") diaperTypes: Collection<DiaperType>,
+        @Param("at") at: Instant,
+    ): List<DiaperEventEntity>
 
     @Query(
         """
@@ -50,15 +78,35 @@ interface DiaperEventJpaRepository : JpaRepository<DiaperEventEntity, UUID> {
 }
 
 interface SleepEventJpaRepository : JpaRepository<SleepEventEntity, UUID> {
-    fun findFirstByChild_IdAndEndedAtIsNullAndOccurredAtLessThanEqualOrderByOccurredAtDescCreatedAtDesc(
-        childId: UUID,
-        occurredAt: Instant,
-    ): SleepEventEntity?
+    @Query(
+        """
+        select e from SleepEventEntity e join fetch e.child c
+        where c.family.id = :familyId and e.endedAt is null and e.occurredAt <= :at
+        """,
+    )
+    fun findOpenForFamilyAt(
+        @Param("familyId") familyId: UUID,
+        @Param("at") at: Instant,
+    ): List<SleepEventEntity>
 
-    fun findFirstByChild_IdAndEndedAtIsNotNullAndEndedAtLessThanEqualOrderByEndedAtDescCreatedAtDesc(
-        childId: UUID,
-        endedAt: Instant,
-    ): SleepEventEntity?
+    @Query(
+        """
+        select e from SleepEventEntity e join fetch e.child c
+        where c.family.id = :familyId and e.endedAt is not null and e.endedAt <= :at
+          and not exists (
+            select newer.id from SleepEventEntity newer
+            where newer.child.id = c.id and newer.endedAt is not null and newer.endedAt <= :at
+              and (
+                newer.endedAt > e.endedAt
+                or (newer.endedAt = e.endedAt and newer.createdAt > e.createdAt)
+              )
+          )
+        """,
+    )
+    fun findLatestEndedForFamilyAt(
+        @Param("familyId") familyId: UUID,
+        @Param("at") at: Instant,
+    ): List<SleepEventEntity>
 
     @Query(
         """

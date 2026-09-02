@@ -3,12 +3,12 @@ import { formatRelativeTime, formatStatusDuration } from "@/lib/dashboard";
 
 type CurrentStatusSummaryProps = {
   summaries: ChildDashboard[];
-  generatedAt: string;
+  referenceAt: string;
 };
 
 export function CurrentStatusSummary({
   summaries,
-  generatedAt,
+  referenceAt,
 }: CurrentStatusSummaryProps) {
   const rows = [
     {
@@ -16,7 +16,7 @@ export function CurrentStatusSummary({
       value: (child: ChildDashboard) => {
         const feeding = child.currentState.lastFeeding;
         return feeding
-          ? `${formatRelativeTime(feeding.occurredAt, generatedAt)} · ${feeding.amountMl}ml`
+          ? `${formatRelativeTime(feeding.occurredAt, referenceAt)} · ${feeding.amountMl}ml`
           : "기록 없음";
       },
     },
@@ -26,18 +26,18 @@ export function CurrentStatusSummary({
         formatStatusDuration(
           child.currentState.sleep.status,
           child.currentState.sleep.since,
-          generatedAt,
+          referenceAt,
         ),
     },
     {
       label: "마지막 소변",
       value: (child: ChildDashboard) =>
-        formatRelativeTime(child.currentState.lastPeeAt, generatedAt),
+        formatRelativeTime(child.currentState.lastPeeAt, referenceAt),
     },
     {
       label: "마지막 대변",
       value: (child: ChildDashboard) =>
-        formatRelativeTime(child.currentState.lastPoopAt, generatedAt),
+        formatRelativeTime(child.currentState.lastPoopAt, referenceAt),
     },
   ];
 
@@ -45,7 +45,7 @@ export function CurrentStatusSummary({
     <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <table
         className="w-full table-fixed border-separate border-spacing-0 text-sm"
-        style={{ minWidth: `${112 + summaries.length * 124}px` }}
+        style={summaries.length > 2 ? { minWidth: `${112 + summaries.length * 124}px` } : undefined}
       >
         <caption className="sr-only">아이별 현재 육아 상태</caption>
         <thead>

@@ -30,14 +30,16 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
   const [feedingChildId, setFeedingChildId] = useState<string | null>(null);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [clockNow, setClockNow] = useState(0);
+  const [clockNow, setClockNow] = useState(() => Date.parse(initialData.generatedAt));
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasSleepingChild = children.some((child) => child.sleep.isSleeping);
   const feedingChild = children.find((child) => child.childId === feedingChildId);
 
   useEffect(() => {
-    if (!hasSleepingChild) return;
-    const timer = window.setInterval(() => setClockNow(Date.now()), 1000);
+    const timer = window.setInterval(
+      () => setClockNow(Date.now()),
+      hasSleepingChild ? 1000 : 30_000,
+    );
     return () => window.clearInterval(timer);
   }, [hasSleepingChild]);
 
@@ -64,6 +66,8 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
   function recordFeeding(amountMl: number) {
     if (!feedingChild) return;
     const target = feedingChild;
+    const actionAt = Date.now();
+    const occurredAt = new Date(actionAt).toISOString();
     setChildren((current) =>
       current.map((child) =>
         child.childId === target.childId
@@ -73,10 +77,15 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
                 totalMl: child.feeding.totalMl + amountMl,
                 count: child.feeding.count + 1,
               },
+              currentState: {
+                ...child.currentState,
+                lastFeeding: { amountMl, occurredAt },
+              },
             }
           : child,
       ),
     );
+    setClockNow(actionAt);
     rememberChild(target.childId);
     setFeedingChildId(null);
     showToast(`${target.name} 분유 ${amountMl}ml를 기록했어요`);
@@ -85,6 +94,8 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
   function recordDiaper(childId: string, kind: DiaperKind) {
     const target = children.find((child) => child.childId === childId);
     if (!target) return;
+    const actionAt = Date.now();
+    const occurredAt = new Date(actionAt).toISOString();
     setChildren((current) =>
       current.map((child) =>
         child.childId === childId
@@ -94,10 +105,15 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
                 ...child.diaper,
                 [kind]: child.diaper[kind] + 1,
               },
+              currentState: {
+                ...child.currentState,
+                [kind === "pee" ? "lastPeeAt" : "lastPoopAt"]: occurredAt,
+              },
             }
           : child,
       ),
     );
+    setClockNow(actionAt);
     rememberChild(childId);
     showToast(`${target.name} ${kind === "pee" ? "소변" : "대변"}을 기록했어요`);
   }
@@ -123,6 +139,10 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
               totalMinutes: child.sleep.totalMinutes + elapsedMinutes,
               isSleeping: false,
             },
+            currentState: {
+              ...child.currentState,
+              sleep: { status: "AWAKE", since: new Date(actionAt).toISOString() },
+            },
           };
         }
         return {
@@ -131,6 +151,10 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
             ...child.sleep,
             isSleeping: true,
             startedAt: new Date(actionAt).toISOString(),
+          },
+          currentState: {
+            ...child.currentState,
+            sleep: { status: "SLEEPING", since: new Date(actionAt).toISOString() },
           },
         };
       }),
@@ -187,7 +211,7 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
           <div className="overflow-hidden rounded-[1.75rem] border border-white/70 bg-surface p-2 surface-shadow dark:border-white/5">
             <CurrentStatusSummary
               summaries={children}
-              generatedAt={initialData.generatedAt}
+              referenceAt={new Date(clockNow).toISOString()}
             />
           </div>
         </section>

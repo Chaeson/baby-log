@@ -19,16 +19,16 @@ export type ChildDashboard = {
     startedAt?: string;
   };
   currentState: {
-    lastFeeding?: {
+    lastFeeding: {
       amountMl: number;
       occurredAt: string;
-    };
+    } | null;
     sleep: {
       status: "SLEEPING" | "AWAKE";
-      since?: string;
+      since: string | null;
     };
-    lastPeeAt?: string;
-    lastPoopAt?: string;
+    lastPeeAt: string | null;
+    lastPoopAt: string | null;
   };
 };
 
@@ -71,7 +71,7 @@ export function formatKoreanDate(date: string): string {
 }
 
 export function formatRelativeTime(
-  occurredAt: string | undefined,
+  occurredAt: string | null | undefined,
   referenceAt: string,
 ): string {
   if (!occurredAt) return "기록 없음";
@@ -93,7 +93,7 @@ export function formatRelativeTime(
 
 export function formatStatusDuration(
   status: "SLEEPING" | "AWAKE",
-  since: string | undefined,
+  since: string | null | undefined,
   referenceAt: string,
 ): string {
   if (!since) return status === "SLEEPING" ? "수면 시작 기록 없음" : "깨어있음 · 시간 기록 없음";
