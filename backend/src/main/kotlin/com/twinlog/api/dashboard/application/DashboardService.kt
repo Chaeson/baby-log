@@ -20,6 +20,7 @@ data class TodayDashboardResponse(
     val familyId: UUID,
     val date: LocalDate,
     val zoneId: String,
+    val generatedAt: Instant,
     val children: List<ChildTodaySummaryResponse>,
 )
 
@@ -33,7 +34,30 @@ data class ChildTodaySummaryResponse(
     val peeCount: Int,
     val poopCount: Int,
     val sleepMinutes: Long,
+    val currentState: ChildCurrentStateResponse,
 )
+
+data class ChildCurrentStateResponse(
+    val lastFeeding: LastFeedingResponse?,
+    val sleep: CurrentSleepResponse,
+    val lastPeeAt: Instant?,
+    val lastPoopAt: Instant?,
+)
+
+data class LastFeedingResponse(
+    val occurredAt: Instant,
+    val amountMl: Int,
+)
+
+data class CurrentSleepResponse(
+    val status: CurrentSleepStatus,
+    val since: Instant?,
+)
+
+enum class CurrentSleepStatus {
+    SLEEPING,
+    AWAKE,
+}
 
 @Service
 class DashboardService(
@@ -63,7 +87,9 @@ class DashboardService(
             familyId = familyId,
             date = today,
             zoneId = zoneId.id,
+            generatedAt = now,
             children = children.map { child ->
+                val childId = requireNotNull(child.id)
                 val feedings = feedingsByChild[child.id].orEmpty()
                 val diapers = diapersByChild[child.id].orEmpty()
                 val sleepMinutes = sleepsByChild[child.id].orEmpty().sumOf { sleep ->
@@ -79,8 +105,45 @@ class DashboardService(
                     peeCount = diapers.count { it.diaperType == DiaperType.PEE || it.diaperType == DiaperType.BOTH },
                     poopCount = diapers.count { it.diaperType == DiaperType.POOP || it.diaperType == DiaperType.BOTH },
                     sleepMinutes = sleepMinutes,
+                    currentState = currentState(childId, now),
                 )
             },
+        )
+    }
+
+    private fun currentState(childId: UUID, now: Instant): ChildCurrentStateResponse {
+        val lastFeeding = feedingRepository
+            .findFirstByChild_IdAndOccurredAtLessThanEqualOrderByOccurredAtDescCreatedAtDesc(childId, now)
+        val lastPee = diaperRepository
+            .findFirstByChild_IdAndDiaperTypeInAndOccurredAtLessThanEqualOrderByOccurredAtDescCreatedAtDesc(
+                childId,
+                listOf(DiaperType.PEE, DiaperType.BOTH),
+                now,
+            )
+        val lastPoop = diaperRepository
+            .findFirstByChild_IdAndDiaperTypeInAndOccurredAtLessThanEqualOrderByOccurredAtDescCreatedAtDesc(
+                childId,
+                listOf(DiaperType.POOP, DiaperType.BOTH),
+                now,
+            )
+        val openSleep = sleepRepository
+            .findFirstByChild_IdAndEndedAtIsNullAndOccurredAtLessThanEqualOrderByOccurredAtDescCreatedAtDesc(childId, now)
+        val lastEndedSleep = if (openSleep == null) {
+            sleepRepository
+                .findFirstByChild_IdAndEndedAtIsNotNullAndEndedAtLessThanEqualOrderByEndedAtDescCreatedAtDesc(childId, now)
+        } else {
+            null
+        }
+
+        return ChildCurrentStateResponse(
+            lastFeeding = lastFeeding?.let { LastFeedingResponse(it.occurredAt, it.amountMl) },
+            sleep = if (openSleep != null) {
+                CurrentSleepResponse(CurrentSleepStatus.SLEEPING, openSleep.startedAt)
+            } else {
+                CurrentSleepResponse(CurrentSleepStatus.AWAKE, lastEndedSleep?.endedAt)
+            },
+            lastPeeAt = lastPee?.occurredAt,
+            lastPoopAt = lastPoop?.occurredAt,
         )
     }
 
@@ -96,4 +159,3 @@ class DashboardService(
         return if (clippedEnd.isAfter(clippedStart)) Duration.between(clippedStart, clippedEnd).toMinutes() else 0
     }
 }
-

@@ -1,6 +1,7 @@
 package com.twinlog.api.event.infrastructure
 
 import com.twinlog.api.event.domain.DiaperEventEntity
+import com.twinlog.api.event.domain.DiaperType
 import com.twinlog.api.event.domain.FeedingEventEntity
 import com.twinlog.api.event.domain.SleepEventEntity
 import org.springframework.data.jpa.repository.JpaRepository
@@ -10,6 +11,11 @@ import java.time.Instant
 import java.util.UUID
 
 interface FeedingEventJpaRepository : JpaRepository<FeedingEventEntity, UUID> {
+    fun findFirstByChild_IdAndOccurredAtLessThanEqualOrderByOccurredAtDescCreatedAtDesc(
+        childId: UUID,
+        occurredAt: Instant,
+    ): FeedingEventEntity?
+
     @Query(
         """
         select e from FeedingEventEntity e join fetch e.child c
@@ -24,6 +30,12 @@ interface FeedingEventJpaRepository : JpaRepository<FeedingEventEntity, UUID> {
 }
 
 interface DiaperEventJpaRepository : JpaRepository<DiaperEventEntity, UUID> {
+    fun findFirstByChild_IdAndDiaperTypeInAndOccurredAtLessThanEqualOrderByOccurredAtDescCreatedAtDesc(
+        childId: UUID,
+        diaperTypes: Collection<DiaperType>,
+        occurredAt: Instant,
+    ): DiaperEventEntity?
+
     @Query(
         """
         select e from DiaperEventEntity e join fetch e.child c
@@ -38,6 +50,16 @@ interface DiaperEventJpaRepository : JpaRepository<DiaperEventEntity, UUID> {
 }
 
 interface SleepEventJpaRepository : JpaRepository<SleepEventEntity, UUID> {
+    fun findFirstByChild_IdAndEndedAtIsNullAndOccurredAtLessThanEqualOrderByOccurredAtDescCreatedAtDesc(
+        childId: UUID,
+        occurredAt: Instant,
+    ): SleepEventEntity?
+
+    fun findFirstByChild_IdAndEndedAtIsNotNullAndEndedAtLessThanEqualOrderByEndedAtDescCreatedAtDesc(
+        childId: UUID,
+        endedAt: Instant,
+    ): SleepEventEntity?
+
     @Query(
         """
         select e from SleepEventEntity e join fetch e.child c
@@ -60,4 +82,3 @@ interface SleepEventJpaRepository : JpaRepository<SleepEventEntity, UUID> {
     )
     fun existsOpenForChild(@Param("childId") childId: UUID): Boolean
 }
-

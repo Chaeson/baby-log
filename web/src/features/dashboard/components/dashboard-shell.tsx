@@ -14,6 +14,7 @@ import type { DashboardSnapshot, DiaperKind } from "@/lib/dashboard";
 import { formatKoreanDate } from "@/lib/dashboard";
 import { ChildCard } from "./child-card";
 import { ComparisonTable } from "./comparison-table";
+import { CurrentStatusSummary } from "./current-status-summary";
 import { FeedingSheet } from "./feeding-sheet";
 import { VoiceSheet } from "./voice-sheet";
 
@@ -170,7 +171,27 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
           </button>
         </header>
 
-        <section className="reveal reveal-delay-1 mt-7" aria-labelledby="today-summary-title">
+        <section className="reveal reveal-delay-1 mt-7" aria-labelledby="current-status-title">
+          <div className="mb-3 flex items-end justify-between px-1">
+            <div>
+              <p className="text-[11px] font-extrabold tracking-[0.14em] text-accent-deep">
+                RIGHT NOW
+              </p>
+              <h2 id="current-status-title" className="mt-0.5 text-lg font-extrabold tracking-[-0.02em]">
+                지금 상태
+              </h2>
+            </div>
+            <p className="text-xs text-ink-muted">마지막 기록 기준</p>
+          </div>
+          <div className="overflow-hidden rounded-[1.75rem] border border-white/70 bg-surface p-2 surface-shadow dark:border-white/5">
+            <CurrentStatusSummary
+              children={children}
+              generatedAt={initialData.generatedAt}
+            />
+          </div>
+        </section>
+
+        <section className="reveal reveal-delay-2 mt-8" aria-labelledby="today-summary-title">
           <div className="mb-3 flex items-end justify-between px-1">
             <div>
               <p className="text-[11px] font-extrabold tracking-[0.14em] text-sage-deep">
@@ -187,7 +208,7 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
           </div>
         </section>
 
-        <section className="reveal reveal-delay-2 mt-8" aria-labelledby="quick-record-title">
+        <section className="reveal mt-8" aria-labelledby="quick-record-title">
           <div className="mb-3 px-1">
             <p className="text-[11px] font-extrabold tracking-[0.14em] text-accent-deep">
               ONE-HAND LOG

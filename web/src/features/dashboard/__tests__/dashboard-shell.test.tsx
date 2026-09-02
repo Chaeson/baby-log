@@ -8,8 +8,8 @@ describe("DashboardShell", () => {
   it("shows twins side by side in one comparison table", () => {
     render(<DashboardShell initialData={mockDashboard} />);
 
-    expect(screen.getByRole("columnheader", { name: /첫째/ })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: /둘째/ })).toBeInTheDocument();
+    expect(screen.getAllByRole("columnheader", { name: /첫째/ })).toHaveLength(2);
+    expect(screen.getAllByRole("columnheader", { name: /둘째/ })).toHaveLength(2);
     expect(screen.getByRole("row", { name: "분유 620ml 580ml" })).toBeInTheDocument();
     expect(screen.getByRole("row", { name: "수면 13시간 20분 14시간 10분" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "지금 상태" })).toBeInTheDocument();
@@ -48,11 +48,11 @@ describe("DashboardShell", () => {
     const user = userEvent.setup();
     render(<DashboardShell initialData={mockDashboard} />);
 
-    await user.click(screen.getByRole("button", { name: "둘째 소변 기록" }));
-    expect(screen.getByText("둘째 소변을 기록했어요")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "첫째 소변 기록" }));
+    expect(screen.getByText("첫째 소변을 기록했어요")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "둘째 수면 시작 기록" }));
-    expect(screen.getByRole("button", { name: "둘째 깨어남 기록" })).toBeInTheDocument();
-    expect(screen.getByText("둘째 수면을 시작했어요")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "첫째 수면 시작 기록" }));
+    expect(screen.getByRole("button", { name: "첫째 깨어남 기록" })).toBeInTheDocument();
+    expect(screen.getByText("첫째 수면을 시작했어요")).toBeInTheDocument();
   });
 });

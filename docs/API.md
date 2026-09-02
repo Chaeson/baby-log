@@ -56,6 +56,17 @@ curl -F 'audio=@voice.webm;type=audio/webm' \
 
 이 API는 transcription만 수행하고 BabyEvent를 생성하지 않습니다. 구조화 결과를 보여주고 사용자가 확인한 뒤 Event를 저장하는 API는 다음 단계입니다. `OPENAI_API_KEY`가 없으면 503, OpenAI 호출 실패는 502를 반환합니다.
 
+## Today dashboard current state
+
+오늘 Dashboard 응답은 기존 일일 합계와 함께 응답 생성 시각인 `generatedAt`과 아이별 `currentState`를 반환합니다.
+
+- `lastFeeding`: 오늘 범위와 관계없이 가장 최근 분유의 시각과 용량
+- `lastPeeAt`, `lastPoopAt`: 가장 최근 기저귀 기록 시각. `BOTH`는 두 항목에 모두 포함
+- `sleep.status`: `SLEEPING` 또는 `AWAKE`
+- `sleep.since`: 수면 중이면 현재 수면 시작, 깨어있으면 최근 수면 종료 시각
+
+수면 기록이 아직 없으면 `AWAKE`이면서 `since`는 `null`입니다. 미래 시각으로 입력된 이벤트는 현재 상태 계산에서 제외합니다.
+
 ## 오류
 
 오류는 RFC 9457 Problem Details 형식으로 반환합니다. 검증 오류는 400, 존재하지 않는 리소스는 404, 현재 상태와 충돌하는 요청은 409, 외부 서비스 설정/장애는 503/502입니다.
