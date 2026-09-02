@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { formatElapsed, formatKoreanDate, formatMinutes } from "@/lib/dashboard";
+import {
+  formatElapsed,
+  formatKoreanDate,
+  formatMinutes,
+  formatRelativeTime,
+} from "@/lib/dashboard";
 
 describe("dashboard formatters", () => {
   it("formats accumulated sleep minutes in Korean", () => {
@@ -16,5 +21,13 @@ describe("dashboard formatters", () => {
     expect(formatKoreanDate("2026-08-31")).toContain("8월 31일");
     expect(formatKoreanDate("2026-08-31")).toContain("월요일");
   });
-});
 
+  it("formats care event times relative to the dashboard snapshot", () => {
+    const generatedAt = "2026-08-31T12:00:00Z";
+
+    expect(formatRelativeTime("2026-08-31T11:59:30Z", generatedAt)).toBe("방금 전");
+    expect(formatRelativeTime("2026-08-31T11:20:00Z", generatedAt)).toBe("40분 전");
+    expect(formatRelativeTime("2026-08-31T10:40:00Z", generatedAt)).toBe("1시간 20분 전");
+    expect(formatRelativeTime(undefined, generatedAt)).toBe("기록 없음");
+  });
+});

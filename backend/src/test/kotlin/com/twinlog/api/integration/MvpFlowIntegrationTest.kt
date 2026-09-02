@@ -27,6 +27,42 @@ class MvpFlowIntegrationTest(
     @Autowired private val objectMapper: ObjectMapper,
 ) {
     @Test
+    fun `dashboard exposes each twin's latest care state without changing today's totals`() {
+        val familyId = createFamily()
+        val firstChildId = createChild(familyId, "첫째", "A", 1)
+        val secondChildId = createChild(familyId, "둘째", "B", 2)
+
+        recordFeeding(firstChildId, 110, "2026-08-30T10:00:00Z")
+        recordFeeding(secondChildId, 90, "2026-08-31T11:05:00Z")
+        recordDiaper(firstChildId, "PEE", "2026-08-31T11:00:00Z")
+        recordDiaper(firstChildId, "POOP", "2026-08-31T04:00:00Z")
+        recordDiaper(secondChildId, "BOTH", "2026-08-31T08:00:00Z")
+
+        val firstSleepId = startSleep(firstChildId, "2026-08-31T08:00:00Z")
+        endSleep(firstSleepId, "2026-08-31T10:55:00Z")
+        startSleep(secondChildId, "2026-08-31T11:18:00Z")
+
+        mockMvc.perform(
+            get("/api/v1/families/{familyId}/dashboard/today", familyId)
+                .queryParam("zoneId", "Asia/Seoul"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.generatedAt").value("2026-08-31T12:00:00Z"))
+            .andExpect(jsonPath("$.children[0].feedingTotalMl").value(0))
+            .andExpect(jsonPath("$.children[0].currentState.lastFeeding.amountMl").value(110))
+            .andExpect(jsonPath("$.children[0].currentState.lastFeeding.occurredAt").value("2026-08-30T10:00:00Z"))
+            .andExpect(jsonPath("$.children[0].currentState.sleep.status").value("AWAKE"))
+            .andExpect(jsonPath("$.children[0].currentState.sleep.since").value("2026-08-31T10:55:00Z"))
+            .andExpect(jsonPath("$.children[0].currentState.lastPeeAt").value("2026-08-31T11:00:00Z"))
+            .andExpect(jsonPath("$.children[0].currentState.lastPoopAt").value("2026-08-31T04:00:00Z"))
+            .andExpect(jsonPath("$.children[1].currentState.lastFeeding.amountMl").value(90))
+            .andExpect(jsonPath("$.children[1].currentState.sleep.status").value("SLEEPING"))
+            .andExpect(jsonPath("$.children[1].currentState.sleep.since").value("2026-08-31T11:18:00Z"))
+            .andExpect(jsonPath("$.children[1].currentState.lastPeeAt").value("2026-08-31T08:00:00Z"))
+            .andExpect(jsonPath("$.children[1].currentState.lastPoopAt").value("2026-08-31T08:00:00Z"))
+    }
+
+    @Test
     fun `family with twins can record events and compare today's dashboard`() {
         val familyId = createFamily()
         val firstChildId = createChild(familyId, "첫째", "A", 1)
@@ -100,19 +136,21 @@ class MvpFlowIntegrationTest(
         return objectMapper.readTree(response)["id"].asText()
     }
 
-    private fun recordFeeding(childId: String, amountMl: Int) {
+    private fun recordFeeding(childId: String, amountMl: Int, occurredAt: String? = null) {
+        val occurredAtField = occurredAt?.let { ",\"occurredAt\":\"$it\"" }.orEmpty()
         mockMvc.perform(
             post("/api/v1/events/feedings")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"childId":"$childId","amountMl":$amountMl}"""),
+                .content("""{"childId":"$childId","amountMl":$amountMl$occurredAtField}"""),
         ).andExpect(status().isCreated)
     }
 
-    private fun recordDiaper(childId: String, diaperType: String) {
+    private fun recordDiaper(childId: String, diaperType: String, occurredAt: String? = null) {
+        val occurredAtField = occurredAt?.let { ",\"occurredAt\":\"$it\"" }.orEmpty()
         mockMvc.perform(
             post("/api/v1/events/diapers")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"childId":"$childId","diaperType":"$diaperType"}"""),
+                .content("""{"childId":"$childId","diaperType":"$diaperType"$occurredAtField}"""),
         ).andExpect(status().isCreated)
     }
 
@@ -142,4 +180,3 @@ class MvpFlowTestClockConfiguration {
     @Primary
     fun fixedClock(): Clock = Clock.fixed(Instant.parse("2026-08-31T12:00:00Z"), ZoneOffset.UTC)
 }
-

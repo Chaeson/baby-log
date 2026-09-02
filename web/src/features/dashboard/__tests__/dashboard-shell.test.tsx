@@ -12,6 +12,7 @@ describe("DashboardShell", () => {
     expect(screen.getByRole("columnheader", { name: /둘째/ })).toBeInTheDocument();
     expect(screen.getByRole("row", { name: "분유 620ml 580ml" })).toBeInTheDocument();
     expect(screen.getByRole("row", { name: "수면 13시간 20분 14시간 10분" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "지금 상태" })).toBeInTheDocument();
   });
 
   it("records a preset feeding without leaving the dashboard", async () => {
