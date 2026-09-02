@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  BarChart3,
   Bell,
   CalendarDays,
   History,
   LayoutDashboard,
+  MessageCircle,
   Mic,
   Settings,
-  Users,
 } from "lucide-react";
 import type { DashboardSnapshot, DiaperKind } from "@/lib/dashboard";
 import { formatKoreanDate } from "@/lib/dashboard";
@@ -255,7 +256,8 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
       >
         <NavItem icon={LayoutDashboard} label="오늘" active />
         <NavItem icon={History} label="기록" />
-        <NavItem icon={Users} label="아이" />
+        <NavItem icon={BarChart3} label="인사이트" />
+        <NavItem icon={MessageCircle} label="AI" />
         <NavItem icon={Settings} label="설정" />
       </nav>
 
