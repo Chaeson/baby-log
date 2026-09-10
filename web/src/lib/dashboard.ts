@@ -26,6 +26,7 @@ export type ChildDashboard = {
     sleep: {
       status: "SLEEPING" | "AWAKE";
       since: string | null;
+      eventId?: string | null;
     };
     lastPeeAt: string | null;
     lastPoopAt: string | null;

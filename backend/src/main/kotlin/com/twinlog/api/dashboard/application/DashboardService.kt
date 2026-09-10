@@ -52,6 +52,7 @@ data class LastFeedingResponse(
 data class CurrentSleepResponse(
     val status: CurrentSleepStatus,
     val since: Instant?,
+    val eventId: UUID? = null,
 )
 
 enum class CurrentSleepStatus {
@@ -73,7 +74,7 @@ class DashboardService(
         val now = clock.instant()
         val today = now.atZone(zoneId).toLocalDate()
         val from = today.atStartOfDay(zoneId).toInstant()
-        val to = today.plusDays(1).atStartOfDay(zoneId).toInstant()
+        val to = now.plusNanos(1)
         val children = familyService.getChildren(familyId)
 
         val feedingsByChild = feedingRepository.findAllForFamilyBetween(familyId, from, to)
@@ -129,6 +130,7 @@ class DashboardService(
                         lastPoopAt = latestPoopByChild[childId]?.occurredAt,
                         openSleepStartedAt = openSleepByChild[childId]?.startedAt,
                         lastSleepEndedAt = latestEndedSleepByChild[childId]?.endedAt,
+                        openSleepId = openSleepByChild[childId]?.id,
                     ),
                 )
             },
@@ -141,11 +143,12 @@ class DashboardService(
         lastPoopAt: Instant?,
         openSleepStartedAt: Instant?,
         lastSleepEndedAt: Instant?,
+        openSleepId: UUID?,
     ): ChildCurrentStateResponse {
         return ChildCurrentStateResponse(
             lastFeeding = lastFeeding,
             sleep = if (openSleepStartedAt != null) {
-                CurrentSleepResponse(CurrentSleepStatus.SLEEPING, openSleepStartedAt)
+                CurrentSleepResponse(CurrentSleepStatus.SLEEPING, openSleepStartedAt, openSleepId)
             } else {
                 CurrentSleepResponse(CurrentSleepStatus.AWAKE, lastSleepEndedAt)
             },

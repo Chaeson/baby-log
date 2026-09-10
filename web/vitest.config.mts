@@ -13,7 +13,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],
-      include: ["src/features/**/*.{ts,tsx}", "src/lib/**/*.ts"],
+      include: ["src/features/**/*.{ts,tsx}", "src/lib/**/*.ts", "src/components/**/*.{ts,tsx}"],
       exclude: ["src/features/**/mock-data.ts", "src/**/*.test.{ts,tsx}", "src/**/__tests__/**"],
       thresholds: {
         statements: 80,

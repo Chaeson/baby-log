@@ -1,17 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  BarChart3,
-  Bell,
-  CalendarDays,
-  History,
-  LayoutDashboard,
-  MessageCircle,
-  Mic,
-  Settings,
-} from "lucide-react";
+import { CalendarDays, Mic } from "lucide-react";
 import type { DashboardSnapshot, DiaperKind } from "@/lib/dashboard";
+import type { CareCommand } from "@/lib/api";
 import { formatKoreanDate } from "@/lib/dashboard";
 import { ChildCard } from "./child-card";
 import { ComparisonTable } from "./comparison-table";
@@ -19,149 +11,115 @@ import { CurrentStatusSummary } from "./current-status-summary";
 import { FeedingSheet } from "./feeding-sheet";
 import { VoiceSheet } from "./voice-sheet";
 
-const LAST_CHILD_STORAGE_KEY = "twinlog:last-child:v1";
-
 type DashboardShellProps = {
   initialData: DashboardSnapshot;
+  onRecord: (command: CareCommand) => Promise<unknown>;
+  onRefresh: () => Promise<void>;
 };
 
-export function DashboardShell({ initialData }: DashboardShellProps) {
-  const [children, setChildren] = useState(initialData.children);
+export function DashboardShell({ initialData, onRecord, onRefresh }: DashboardShellProps) {
+  const children = initialData.children;
   const [feedingChildId, setFeedingChildId] = useState<string | null>(null);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const [needsRefresh, setNeedsRefresh] = useState(false);
   const [clockNow, setClockNow] = useState(() => Date.parse(initialData.generatedAt));
+  const mutationRef = useRef(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hasSleepingChild = children.some((child) => child.sleep.isSleeping);
   const feedingChild = children.find((child) => child.childId === feedingChildId);
 
   useEffect(() => {
-    const timer = window.setInterval(
-      () => setClockNow(Date.now()),
-      hasSleepingChild ? 1000 : 30_000,
-    );
+    const timer = window.setInterval(() => setClockNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
-  }, [hasSleepingChild]);
+  }, []);
+
+  useEffect(() => () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+  }, []);
 
   useEffect(() => {
-    return () => {
-      if (toastTimer.current) clearTimeout(toastTimer.current);
+    let active = true;
+    let refreshing = false;
+    const sync = () => {
+      if (document.visibilityState === "hidden" || mutationRef.current || refreshing) return;
+      refreshing = true;
+      void onRefresh()
+        .then(() => { if (active) setClockNow(Date.now()); })
+        .catch(() => { if (active) setError("최신 상태를 불러오지 못했어요. 새로고침해 주세요."); })
+        .finally(() => { refreshing = false; });
     };
-  }, []);
+    // A retained workspace may contain an older snapshot when this screen returns.
+    sync();
+    window.addEventListener("focus", sync);
+    document.addEventListener("visibilitychange", sync);
+    const timer = window.setInterval(sync, 30_000);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", sync);
+      document.removeEventListener("visibilitychange", sync);
+      window.clearInterval(timer);
+    };
+  }, [onRefresh]);
 
   function showToast(message: string) {
     setToast(message);
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), 2400);
+    toastTimer.current = setTimeout(() => setToast(null), 3500);
   }
 
-  function rememberChild(childId: string) {
+  async function refresh() {
+    if (mutationRef.current) return;
+    mutationRef.current = true;
+    setPending(true);
     try {
-      window.localStorage.setItem(LAST_CHILD_STORAGE_KEY, childId);
-    } catch {
-      // Private browsing or storage restrictions should not block a record.
-    }
+      await onRefresh();
+      setError(null); setNeedsRefresh(false); setClockNow(Date.now());
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "새로고침하지 못했어요.");
+    } finally { mutationRef.current = false; setPending(false); }
+  }
+
+  async function save(command: CareCommand, message: string) {
+    if (mutationRef.current || needsRefresh) return;
+    mutationRef.current = true; setPending(true); setError(null);
+    let saved = false;
+    try {
+      await onRecord(command);
+      saved = true;
+      setFeedingChildId(null);
+      showToast(message);
+      await onRefresh();
+      setClockNow(Date.now());
+    } catch (cause) {
+      setNeedsRefresh(true);
+      setError(saved ? "기록은 저장됐어요. 화면 갱신에 실패했으니 새로고침해 주세요."
+        : cause instanceof Error ? cause.message : "저장 결과를 확인하지 못했어요. 기록을 새로고침해 주세요.");
+    } finally { mutationRef.current = false; setPending(false); }
   }
 
   function recordFeeding(amountMl: number) {
-    if (!feedingChild) return;
-    const target = feedingChild;
-    const actionAt = Date.now();
-    const occurredAt = new Date(actionAt).toISOString();
-    setChildren((current) =>
-      current.map((child) =>
-        child.childId === target.childId
-          ? {
-              ...child,
-              feeding: {
-                totalMl: child.feeding.totalMl + amountMl,
-                count: child.feeding.count + 1,
-              },
-              currentState: {
-                ...child.currentState,
-                lastFeeding: { amountMl, occurredAt },
-              },
-            }
-          : child,
-      ),
-    );
-    setClockNow(actionAt);
-    rememberChild(target.childId);
-    setFeedingChildId(null);
-    showToast(`${target.name} 분유 ${amountMl}ml를 기록했어요`);
+    if (feedingChild) void save({ type: "FEEDING", childId: feedingChild.childId, amountMl },
+      `${feedingChild.name} 분유 ${amountMl}ml를 기록했어요`);
   }
 
   function recordDiaper(childId: string, kind: DiaperKind) {
-    const target = children.find((child) => child.childId === childId);
-    if (!target) return;
-    const actionAt = Date.now();
-    const occurredAt = new Date(actionAt).toISOString();
-    setChildren((current) =>
-      current.map((child) =>
-        child.childId === childId
-          ? {
-              ...child,
-              diaper: {
-                ...child.diaper,
-                [kind]: child.diaper[kind] + 1,
-              },
-              currentState: {
-                ...child.currentState,
-                [kind === "pee" ? "lastPeeAt" : "lastPoopAt"]: occurredAt,
-              },
-            }
-          : child,
-      ),
-    );
-    setClockNow(actionAt);
-    rememberChild(childId);
-    showToast(`${target.name} ${kind === "pee" ? "소변" : "대변"}을 기록했어요`);
+    const child = children.find((item) => item.childId === childId);
+    if (child) void save({ type: "DIAPER", childId, diaperType: kind === "pee" ? "PEE" : "POOP" },
+      `${child.name} ${kind === "pee" ? "소변" : "대변"}을 기록했어요`);
   }
 
   function toggleSleep(childId: string) {
-    const target = children.find((child) => child.childId === childId);
-    if (!target) return;
-    const actionAt = Date.now();
-    const message = target.sleep.isSleeping
-      ? `${target.name} 깨어남을 기록했어요`
-      : `${target.name} 수면을 시작했어요`;
-    setChildren((current) =>
-      current.map((child) => {
-        if (child.childId !== childId) return child;
-        if (child.sleep.isSleeping) {
-          const startedAt = child.sleep.startedAt
-            ? Date.parse(child.sleep.startedAt)
-            : actionAt;
-          const elapsedMinutes = Math.max(1, Math.floor((actionAt - startedAt) / 60_000));
-          return {
-            ...child,
-            sleep: {
-              totalMinutes: child.sleep.totalMinutes + elapsedMinutes,
-              isSleeping: false,
-            },
-            currentState: {
-              ...child.currentState,
-              sleep: { status: "AWAKE", since: new Date(actionAt).toISOString() },
-            },
-          };
-        }
-        return {
-          ...child,
-          sleep: {
-            ...child.sleep,
-            isSleeping: true,
-            startedAt: new Date(actionAt).toISOString(),
-          },
-          currentState: {
-            ...child.currentState,
-            sleep: { status: "SLEEPING", since: new Date(actionAt).toISOString() },
-          },
-        };
-      }),
-    );
-    setClockNow(actionAt);
-    rememberChild(childId);
-    showToast(message);
+    const child = children.find((item) => item.childId === childId);
+    if (!child) return;
+    if (child.sleep.isSleeping) {
+      const sleepId = child.currentState.sleep.eventId;
+      if (!sleepId) { setError("수면 기록을 확인하려면 새로고침해 주세요."); setNeedsRefresh(true); return; }
+      void save({ type: "SLEEP_END", sleepId }, `${child.name} 깨어남을 기록했어요`);
+    } else {
+      void save({ type: "SLEEP_START", childId }, `${child.name} 수면을 시작했어요`);
+    }
   }
 
   return (
@@ -174,7 +132,7 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
                 TWINLOG
               </span>
               <span className="rounded-full border border-line bg-surface/75 px-2 py-0.5 text-[10px] font-bold text-ink-muted">
-                MOCK
+                가족 기록
               </span>
             </div>
             <h1 className="font-display text-[2rem] leading-none tracking-[-0.04em] text-ink">
@@ -185,16 +143,11 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
               {formatKoreanDate(initialData.date)} · {initialData.familyName}
             </p>
           </div>
-          <button
-            type="button"
-            disabled
-            className="relative grid size-11 cursor-not-allowed place-items-center rounded-2xl border border-line bg-surface/85 text-ink shadow-sm opacity-80"
-            aria-label="알림 — 준비 중"
-          >
-            <Bell className="size-5" aria-hidden="true" />
-            <span className="absolute right-2.5 top-2.5 size-1.5 rounded-full bg-accent" />
-          </button>
+          <button type="button" disabled={pending} onClick={() => void refresh()} className="action">새로고침</button>
         </header>
+        {error && <p role="alert" className="panel mt-4 text-accent-deep">{error}</p>}
+        {pending && <p role="status" className="mt-3 text-sm">처리 중…</p>}
+        {children.length === 0 && <p className="panel mt-5">등록된 아이가 없어요. 설정에서 가족을 확인해 주세요.</p>}
 
         <section className="reveal reveal-delay-1 mt-7" aria-labelledby="current-status-title">
           <div className="mb-3 flex items-end justify-between px-1">
@@ -248,6 +201,7 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
                 key={child.childId}
                 child={child}
                 clockNow={clockNow}
+                disabled={pending || needsRefresh}
                 onFeeding={setFeedingChildId}
                 onDiaper={recordDiaper}
                 onSleep={toggleSleep}
@@ -267,23 +221,14 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
             </span>
             <span>
               <span className="block text-sm font-extrabold">음성으로 기록</span>
-              <span className="block text-[11px] text-surface/65">최대 30초 · Backend STT</span>
+              <span className="block text-[11px] text-surface/65">최대 30초 · 말한 내용을 확인해요</span>
             </span>
           </span>
           <span className="rounded-full bg-surface/10 px-2.5 py-1 text-[10px] font-bold">녹음</span>
         </button>
       </main>
 
-      <nav
-        aria-label="주요 메뉴"
-        className="safe-bottom fixed inset-x-0 bottom-0 z-30 mx-auto flex w-full max-w-2xl items-center justify-around border-t border-line/80 bg-surface/90 px-4 pt-2 backdrop-blur-xl"
-      >
-        <NavItem icon={LayoutDashboard} label="오늘" active />
-        <NavItem icon={History} label="기록" />
-        <NavItem icon={BarChart3} label="인사이트" />
-        <NavItem icon={MessageCircle} label="AI" />
-        <NavItem icon={Settings} label="설정" />
-      </nav>
+
 
       {feedingChild ? (
         <FeedingSheet
@@ -291,6 +236,8 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
           child={feedingChild}
           onClose={() => setFeedingChildId(null)}
           onSave={recordFeeding}
+          disabled={pending || needsRefresh}
+          error={error}
         />
       ) : null}
       {voiceOpen ? <VoiceSheet onClose={() => setVoiceOpen(false)} /> : null}
@@ -305,28 +252,5 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
         {toast ?? ""}
       </div>
     </div>
-  );
-}
-
-type NavItemProps = {
-  icon: typeof LayoutDashboard;
-  label: string;
-  active?: boolean;
-};
-
-function NavItem({ icon: Icon, label, active = false }: NavItemProps) {
-  return (
-    <button
-      type="button"
-      disabled={!active}
-      aria-current={active ? "page" : undefined}
-      aria-label={active ? label : `${label} — 준비 중`}
-      className={`flex min-h-12 min-w-14 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed ${
-        active ? "text-accent-deep" : "text-ink-muted/65"
-      }`}
-    >
-      <Icon className="size-5" strokeWidth={active ? 2.4 : 1.8} aria-hidden="true" />
-      {label}
-    </button>
   );
 }

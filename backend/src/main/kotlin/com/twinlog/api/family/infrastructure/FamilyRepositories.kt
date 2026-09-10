@@ -3,13 +3,23 @@ package com.twinlog.api.family.infrastructure
 import com.twinlog.api.family.domain.ChildEntity
 import com.twinlog.api.family.domain.FamilyEntity
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
+import jakarta.persistence.LockModeType
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import java.util.UUID
 
-interface FamilyJpaRepository : JpaRepository<FamilyEntity, UUID>
+interface FamilyJpaRepository : JpaRepository<FamilyEntity, UUID> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select f from FamilyEntity f where f.id = :id")
+    fun findForUpdate(@Param("id") id: UUID): FamilyEntity?
+}
 
 interface ChildJpaRepository : JpaRepository<ChildEntity, UUID> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select c from ChildEntity c where c.id = :id")
+    fun findForUpdate(@Param("id") id: UUID): ChildEntity?
+
     @Query(
         """
         select c from ChildEntity c
@@ -30,4 +40,3 @@ interface ChildJpaRepository : JpaRepository<ChildEntity, UUID> {
         @Param("birthOrder") birthOrder: Int,
     ): Boolean
 }
-

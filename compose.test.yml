@@ -1,0 +1,18 @@
+# Dedicated disposable PostgreSQL for ./gradlew postgresTest; never use real records here.
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: twinlog_test
+      POSTGRES_USER: twinlog_test
+      POSTGRES_PASSWORD: local-test-only-password
+    ports:
+      - '127.0.0.1:15432:5432'
+    # No persistent volume: this is intentionally isolated from compose.yml's DB.
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U twinlog_test -d twinlog_test']
+      interval: 5s
+      timeout: 3s
+      retries: 20

@@ -5,6 +5,8 @@ import com.twinlog.api.event.domain.DiaperType
 import com.twinlog.api.event.domain.FeedingEventEntity
 import com.twinlog.api.event.domain.SleepEventEntity
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
+import jakarta.persistence.LockModeType
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import java.time.Instant
@@ -78,6 +80,10 @@ interface DiaperEventJpaRepository : JpaRepository<DiaperEventEntity, UUID> {
 }
 
 interface SleepEventJpaRepository : JpaRepository<SleepEventEntity, UUID> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select e from SleepEventEntity e where e.id = :id")
+    fun findForUpdate(@Param("id") id: UUID): SleepEventEntity?
+
     @Query(
         """
         select e from SleepEventEntity e join fetch e.child c

@@ -1,0 +1,473 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: TwinLog Seoul restricted pilot - ECS Fargate ARM64 and always-on Aurora PostgreSQL.
+# This template is NOT a KRW 10,000/month or high-availability configuration.
+# TODO(public release): implement authentication, family authorization and rate limits.
+# Until then, HTTPS access is restricted to one operator IPv4 address.
+Parameters:
+  ImageUri:
+    Type: String
+    Description: 'REQUIRED: same-account Seoul ECR image URI with immutable release tag (not latest).'
+    AllowedPattern: '[0-9]{12}\.dkr\.ecr\.ap-northeast-2\.amazonaws\.com/[a-z0-9/_-]+:[A-Za-z0-9_.-]+'
+  RepositoryArn:
+    Type: String
+    Description: 'REQUIRED: RepositoryArn output of ecr.yml, matching ImageUri.'
+    AllowedPattern: 'arn:aws:ecr:ap-northeast-2:[0-9]{12}:repository/.+'
+  AuroraEngineVersion:
+    Type: String
+    Description: 'REQUIRED: currently available Aurora PostgreSQL 16 minor, verified in Seoul for db.serverless.'
+    AllowedPattern: '16\.[0-9]+'
+  CertificateArn:
+    Type: String
+    Description: 'REQUIRED: issued ACM certificate in Seoul covering ApiDomainName.'
+    AllowedPattern: 'arn:aws:acm:ap-northeast-2:[0-9]{12}:certificate/.+'
+  ApiDomainName:
+    Type: String
+    Description: 'REQUIRED: DNS hostname for the API (no scheme or path).'
+    AllowedPattern: '[a-z0-9][a-z0-9.-]+\.[a-z]{2,}'
+  WebAllowedOrigins:
+    Type: String
+    Description: 'REQUIRED: exact HTTPS web origin(s), comma-separated, no trailing slash.'
+    AllowedPattern: 'https://[A-Za-z0-9.-]+(:[0-9]+)?(,https://[A-Za-z0-9.-]+(:[0-9]+)?)*'
+  AllowedClientCidr:
+    Type: String
+    Description: 'REQUIRED: trusted operator public IPv4 /32. No public access before auth is implemented.'
+    AllowedPattern: '((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])/32'
+  HostedZoneId:
+    Type: String
+    Default: ''
+    Description: 'OPTIONAL: Route 53 public hosted zone ID. Empty = configure DNS manually.'
+  TaskMemory:
+    Type: String
+    Default: '1024'
+    AllowedValues: ['1024', '2048']
+    Description: 'MiB. Start at 1024; increase only after observing JVM memory/latency.'
+  AuroraMaxAcu:
+    Type: Number
+    Default: 1
+    AllowedValues: [1, 2, 4]
+    Description: 'Cost-sensitive ceiling; NOT a spending cap. Minimum remains 0.5 (no auto-pause).'
+  OpenAiSecretArn:
+    Type: String
+    Default: ''
+    Description: 'OPTIONAL: same-region Secrets Manager ARN containing the API key as plaintext SecretString, not JSON. Empty disables STT.'
+  AppDatabaseSecretArn:
+    Type: String
+    Default: ''
+    Description: 'OPTIONAL: existing same-region secret with username/password JSON for a pre-provisioned DML-only DB user. See deployment guide.'
+  LogRetentionDays:
+    Type: Number
+    Default: 7
+    AllowedValues: [3, 7, 14, 30]
+Rules:
+  SeoulOnly:
+    Assertions:
+      - Assert: !Equals [!Ref 'AWS::Region', ap-northeast-2]
+        AssertDescription: This template and bundled DB certificate are scoped to Seoul.
+Conditions:
+  HasHostedZone: !Not [!Equals [!Ref HostedZoneId, '']]
+  HasOpenAiSecret: !Not [!Equals [!Ref OpenAiSecretArn, '']]
+  HasAppDatabaseSecret: !Not [!Equals [!Ref AppDatabaseSecretArn, '']]
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.42.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: 10.42.0.0/24
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: 10.42.1.0/24
+  DatabaseSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: 10.42.10.0/24
+  DatabaseSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: 10.42.11.0/24
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  PublicRouteA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicRouteTable
+  PublicRouteB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetB
+      RouteTableId: !Ref PublicRouteTable
+  # Database subnets use a dedicated local-only route table. No NAT or IGW route.
+  DatabaseRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+  DatabaseRouteA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref DatabaseSubnetA
+      RouteTableId: !Ref DatabaseRouteTable
+  DatabaseRouteB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref DatabaseSubnetB
+      RouteTableId: !Ref DatabaseRouteTable
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: HTTPS from the trusted operator only
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref AllowedClientCidr
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          DestinationSecurityGroupId: !Ref TaskSecurityGroup
+  TaskSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Backend - no direct internet ingress
+      VpcId: !Ref Vpc
+      SecurityGroupEgress:
+        # Public egress avoids NAT fixed costs: ECR, logs, Secrets Manager, OpenAI.
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          DestinationSecurityGroupId: !Ref DatabaseSecurityGroup
+  TaskIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref TaskSecurityGroup
+      IpProtocol: tcp
+      FromPort: 8080
+      ToPort: 8080
+      SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+  DatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Private Aurora - PostgreSQL from backend only
+      VpcId: !Ref Vpc
+      # Suppress EC2's default allow-all egress; no initiated outbound traffic.
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 1
+          ToPort: 1
+          CidrIp: 127.0.0.1/32
+  DatabaseIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref DatabaseSecurityGroup
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
+      SourceSecurityGroupId: !Ref TaskSecurityGroup
+  DatabaseSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Isolated Aurora subnets across two AZs
+      SubnetIds: [!Ref DatabaseSubnetA, !Ref DatabaseSubnetB]
+  DatabaseParameters:
+    Type: AWS::RDS::DBClusterParameterGroup
+    Properties:
+      Description: Aurora PostgreSQL 16 - require encrypted connections
+      Family: aurora-postgresql16
+      Parameters:
+        rds.force_ssl: '1'
+  DatabaseSecret:
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Description: TwinLog bootstrap/migration database credentials - never output the value
+      GenerateSecretString:
+        SecretStringTemplate: '{"username":"twinlog_admin"}'
+        GenerateStringKey: password
+        PasswordLength: 40
+        ExcludePunctuation: true
+      # No independent rotation: rotate DB + secret together, then replace ECS tasks.
+  DatabaseCluster:
+    Type: AWS::RDS::DBCluster
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      Engine: aurora-postgresql
+      EngineMode: provisioned # Serverless v2 uses provisioned mode + db.serverless instance.
+      EngineVersion: !Ref AuroraEngineVersion
+      DatabaseName: twinlog
+      Port: 5432
+      MasterUsername: !Sub '{{resolve:secretsmanager:${DatabaseSecret}:SecretString:username}}'
+      MasterUserPassword: !Sub '{{resolve:secretsmanager:${DatabaseSecret}:SecretString:password}}'
+      StorageEncrypted: true
+      StorageType: aurora
+      DeletionProtection: true
+      BackupRetentionPeriod: 7
+      DBSubnetGroupName: !Ref DatabaseSubnetGroup
+      DBClusterParameterGroupName: !Ref DatabaseParameters
+      VpcSecurityGroupIds: [!Ref DatabaseSecurityGroup]
+      ServerlessV2ScalingConfiguration:
+        MinCapacity: 0.5 # Always-on: zero/auto-pause conflicts with immediate responses.
+        MaxCapacity: !Ref AuroraMaxAcu
+  DatabaseWriter:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      Engine: aurora-postgresql
+      DBClusterIdentifier: !Ref DatabaseCluster
+      DBInstanceClass: db.serverless
+      PubliclyAccessible: false
+      EnablePerformanceInsights: false
+      MonitoringInterval: 0
+      AutoMinorVersionUpgrade: true
+  DatabaseSecretAttachment:
+    Type: AWS::SecretsManager::SecretTargetAttachment
+    Properties:
+      SecretId: !Ref DatabaseSecret
+      TargetId: !Ref DatabaseCluster
+      TargetType: AWS::RDS::DBCluster
+  Logs:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RetentionInDays: !Ref LogRetentionDays
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: ecs-tasks.amazonaws.com}
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: PullImageWriteLogsReadConfiguredSecrets
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: '*'
+              - Effect: Allow
+                Action: [ecr:BatchCheckLayerAvailability, ecr:GetDownloadUrlForLayer, ecr:BatchGetImage]
+                Resource: !Ref RepositoryArn
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt Logs.Arn
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource:
+                  - !Ref DatabaseSecret
+                  - !If [HasOpenAiSecret, !Ref OpenAiSecretArn, !Ref 'AWS::NoValue']
+                  - !If [HasAppDatabaseSecret, !Ref AppDatabaseSecretArn, !Ref 'AWS::NoValue']
+      # Optional secrets must use the AWS-managed Secrets Manager key.
+      # TODO(custom KMS key): grant scoped kms:Decrypt and update the key policy.
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: ecs-tasks.amazonaws.com}
+            Action: sts:AssumeRole
+      # The application does not need AWS API access. ExecutionRole injects secrets.
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterSettings:
+        - Name: containerInsights
+          Value: disabled
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      RequiresCompatibilities: [FARGATE]
+      NetworkMode: awsvpc
+      Cpu: '256'
+      Memory: !Ref TaskMemory
+      RuntimePlatform:
+        CpuArchitecture: ARM64
+        OperatingSystemFamily: LINUX
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: backend
+          Image: !Ref ImageUri
+          Essential: true
+          User: '10001:10001'
+          LinuxParameters:
+            Capabilities:
+              Drop: [ALL]
+          StopTimeout: 60
+          PortMappings:
+            - ContainerPort: 8080
+              Protocol: tcp
+          Environment:
+            - Name: SPRING_PROFILES_ACTIVE
+              Value: prod
+            - Name: DB_URL
+              Value: !Sub 'jdbc:postgresql://${DatabaseCluster.Endpoint.Address}:5432/twinlog?sslmode=verify-full&sslrootcert=/app/certs/ap-northeast-2-bundle.pem&connectTimeout=10&socketTimeout=30&tcpKeepAlive=true'
+            - Name: WEB_ALLOWED_ORIGINS
+              Value: !Ref WebAllowedOrigins
+            - Name: FORWARD_HEADERS_STRATEGY
+              Value: framework
+          Secrets:
+            # Bootstrap default is the migration user. Switch to AppDatabaseSecretArn
+            # (pre-provisioned DML user) before adding real family records.
+            - Name: DB_USERNAME
+              ValueFrom: !If [HasAppDatabaseSecret, !Sub '${AppDatabaseSecretArn}:username::', !Sub '${DatabaseSecret}:username::']
+            - Name: DB_PASSWORD
+              ValueFrom: !If [HasAppDatabaseSecret, !Sub '${AppDatabaseSecretArn}:password::', !Sub '${DatabaseSecret}:password::']
+            - Name: SPRING_FLYWAY_USER
+              ValueFrom: !Sub '${DatabaseSecret}:username::'
+            - Name: SPRING_FLYWAY_PASSWORD
+              ValueFrom: !Sub '${DatabaseSecret}:password::'
+            - !If
+              - HasOpenAiSecret
+              - Name: OPENAI_API_KEY
+                ValueFrom: !Ref OpenAiSecretArn
+              - !Ref 'AWS::NoValue'
+          HealthCheck:
+            Command: [CMD-SHELL, 'curl --fail --silent --max-time 4 http://127.0.0.1:8080/actuator/health/liveness || exit 1']
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 180
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref Logs
+              awslogs-region: !Ref 'AWS::Region'
+              awslogs-stream-prefix: backend
+              mode: non-blocking
+              max-buffer-size: 1m
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    DependsOn: GatewayAttachment
+    Properties:
+      Type: application
+      Scheme: internet-facing
+      IpAddressType: ipv4
+      Subnets: [!Ref PublicSubnetA, !Ref PublicSubnetB]
+      SecurityGroups: [!Ref LoadBalancerSecurityGroup]
+      LoadBalancerAttributes:
+        - Key: routing.http.drop_invalid_header_fields.enabled
+          Value: 'true'
+        - Key: idle_timeout.timeout_seconds
+          Value: '120'
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref Vpc
+      TargetType: ip
+      Port: 8080
+      Protocol: HTTP
+      HealthCheckPath: /actuator/health/readiness # Checks DB connectivity too.
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 15
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Matcher: {HttpCode: '200'}
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '30'
+  HttpsListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      Certificates:
+        - CertificateArn: !Ref CertificateArn
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+  Service:
+    Type: AWS::ECS::Service
+    DependsOn: [HttpsListener, DatabaseWriter, DatabaseSecretAttachment, PublicRoute, PublicRouteA, PublicRouteB, TaskIngress, DatabaseIngress]
+    Properties:
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref TaskDefinition
+      LaunchType: FARGATE # On-demand, not interruptible Spot.
+      PlatformVersion: '1.4.0'
+      DesiredCount: 1
+      AvailabilityZoneRebalancing: DISABLED
+      HealthCheckGracePeriodSeconds: 240
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200 # Up to two tasks temporarily during deployment.
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED # Needed for outbound calls without NAT.
+          Subnets: [!Ref PublicSubnetA, !Ref PublicSubnetB]
+          SecurityGroups: [!Ref TaskSecurityGroup]
+      LoadBalancers:
+        - ContainerName: backend
+          ContainerPort: 8080
+          TargetGroupArn: !Ref TargetGroup
+  ApiDnsRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: HasHostedZone
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref ApiDomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt LoadBalancer.DNSName
+        HostedZoneId: !GetAtt LoadBalancer.CanonicalHostedZoneID
+Outputs:
+  ApiUrl:
+    Value: !Sub 'https://${ApiDomainName}'
+  LoadBalancerDnsName:
+    Value: !GetAtt LoadBalancer.DNSName
+  EcsCluster:
+    Value: !Ref Cluster
+  EcsService:
+    Value: !GetAtt Service.Name
+  DatabaseEndpoint:
+    Value: !GetAtt DatabaseCluster.Endpoint.Address
+  DatabaseSecretArn:
+    Value: !Ref DatabaseSecret
+  TaskSecurityGroupId:
+    Value: !Ref TaskSecurityGroup
+  PublicSubnetId:
+    Value: !Ref PublicSubnetA

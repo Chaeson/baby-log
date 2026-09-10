@@ -10,9 +10,11 @@ type FeedingSheetProps = {
   child: ChildDashboard;
   onClose: () => void;
   onSave: (amountMl: number) => void;
+  disabled?: boolean;
+  error?: string | null;
 };
 
-export function FeedingSheet({ child, onClose, onSave }: FeedingSheetProps) {
+export function FeedingSheet({ child, onClose, onSave, disabled = false, error }: FeedingSheetProps) {
   const [customAmount, setCustomAmount] = useState("");
   const parsedAmount = Number(customAmount);
   const canSave = Number.isInteger(parsedAmount) && parsedAmount > 0 && parsedAmount <= 2000;
@@ -55,10 +57,12 @@ export function FeedingSheet({ child, onClose, onSave }: FeedingSheetProps) {
         </header>
 
         <p className="mt-5 text-sm text-ink-muted">자주 쓰는 양은 누르면 바로 기록돼요.</p>
+        {error && <p role="alert" className="mt-3 text-sm text-accent-deep">{error} 닫기 후 새로고침할 수 있어요.</p>}
         <div className="mt-3 grid grid-cols-3 gap-2.5">
           {PRESET_AMOUNTS.map((amount) => (
             <button
               key={amount}
+              disabled={disabled}
               type="button"
               onClick={() => onSave(amount)}
               className="min-h-14 rounded-2xl border border-line bg-surface-strong text-base font-extrabold tabular-nums shadow-sm transition hover:border-accent/60 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
@@ -86,7 +90,7 @@ export function FeedingSheet({ child, onClose, onSave }: FeedingSheetProps) {
         </div>
         <button
           type="button"
-          disabled={!canSave}
+          disabled={disabled || !canSave}
           onClick={() => onSave(parsedAmount)}
           className="mt-4 min-h-14 w-full rounded-2xl bg-ink px-5 text-base font-extrabold text-surface transition enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
         >

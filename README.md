@@ -6,7 +6,7 @@ TwinLog는 쌍둥이와 다태아를 한 화면에서 비교하고, 한 손으�
 
 ## 현재 구현 상태
 
-모바일 Dashboard mock과 실제 음성 transcription 경로를 완료했습니다.
+모바일 Dashboard와 실제 Backend 기록/조회 API, 음성 transcription 경로를 구현하고 있습니다.
 
 - `첫째 | 둘째`가 같은 열에 유지되는 오늘 비교표
 - 마지막 분유·현재 수면·마지막 소변/대변을 함께 보는 현재 상태표
@@ -20,13 +20,18 @@ TwinLog는 쌍둥이와 다태아를 한 화면에서 비교하고, 한 손으�
 - 모바일 다크 모드와 safe-area 대응
 - 오늘·기록·인사이트·AI·설정의 5개 기본 메뉴 구조
 
-Dashboard의 육아 데이터는 아직 의도적으로 mock입니다. 음성은 실제 Backend API에 연결되어 있지만 인식 문장을 BabyEvent로 구조화·저장하지는 않습니다. 다음 마일스톤에서 기존 기록 API와 Dashboard 조회를 연결합니다.
+Backend에는 가족/아이 일괄 등록, 분유·기저귀·수면 기록, 오늘 상태/합계, 최대 31일 통합 Timeline, 1~30일 인사이트 API가 있습니다. Web은 실제 API로 연결되어 있으며 mock 데이터는 테스트에만 사용합니다. 음성은 transcription까지 지원하고 자연어를 육아 기록으로 저장하는 기능과 AI 대화는 아직 연결 전입니다.
+
+기록 메뉴의 오늘/어제/날짜 선택/7일/30일, 아이별·유형별 필터와 인사이트 메뉴의 수유/수면/대소변/비교가 동작합니다. 설정에서는 가족 ID 확인, 아이 추가, 브라우저 연결 해제를 제공합니다.
+
+현재 DB 연결 전 로컬 검증 방법과 남은 범위는 [docs/DB_READINESS.md](docs/DB_READINESS.md)를 참고하세요.
 
 ## 저장소 구조
 
 ```text
 TwinLog/
 ├── backend/  # Kotlin, Spring Boot, PostgreSQL, Flyway
+├── infra/aws/ # 주석 포함 ECS/Aurora CloudFormation과 설정 예시
 ├── web/      # Next.js, React, TypeScript, App Router, Tailwind CSS
 ├── ios/      # 보존 중인 네이티브 클라이언트 골격 (현재 우선순위 제외)
 └── docs/     # 아키텍처와 API 설명
@@ -68,6 +73,16 @@ DB_USERNAME=postgres DB_PASSWORD=postgres ./gradlew bootRun
 
 기본 연결은 `jdbc:postgresql://localhost:5432/twinlog`입니다. `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`로 변경할 수 있으며 스키마는 Flyway가 관리합니다.
 
+Docker가 있으면 PostgreSQL과 Backend를 함께 실행할 수 있습니다.
+
+```bash
+docker compose up --build
+```
+
+ECS/Aurora 배포 YAML과 나중에 채울 값은 `infra/aws/`에 있습니다. 기본값은 ARM64 0.25 vCPU/1 GiB와 Aurora 0.5~1 ACU입니다.
+설정·배포 절차·비용 제약은 [docs/AWS_DEPLOYMENT.md](docs/AWS_DEPLOYMENT.md)에 정리했습니다. AWS 리소스는 아직 생성하지 않았습니다.
+현재 인증 미구현으로 지정 IP 파일럿만 허용하며, 이 상시 구성은 전체 월 1만원대 예산을 충족하지 못합니다.
+
 테스트는 별도 PostgreSQL 설치 없이 H2의 PostgreSQL 호환 모드에서 실행됩니다.
 
 ```bash
@@ -91,9 +106,9 @@ Web은 기본적으로 `http://127.0.0.1:8080`을 호출합니다. 다른 주소
 
 ## 개발 순서
 
-1. 모바일 Dashboard mock과 빠른 기록 UI — 완료
-2. Web과 기존 REST API 연결
-3. PostgreSQL 저장 및 기록 후 Dashboard 재조회
+1. 모바일 Dashboard와 빠른 기록 UI — 완료
+2. Web과 REST API 연결, 날짜별 기록, 기본 인사이트 — 완료
+3. PostgreSQL/Aurora 실DB 검증 — 다음 단계 (현재 H2로 API 흐름 검증)
 4. 모바일 Safari/Chrome 실제 기기 검증
 5. Family/User, 인증, 초대, 기록 내역, 기본 PWA
 6. 음성 녹음과 Backend STT — 완료, AI 구조화 기록과 질의 — 예정

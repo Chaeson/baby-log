@@ -55,6 +55,9 @@ class BabyEventService(
 
     @Transactional
     fun startSleep(request: StartSleepRequest): SleepResponse {
+        // Lock the child even when no sleep exists, serializing simultaneous starts.
+        val child = childRepository.findForUpdate(request.childId)
+            ?: throw ResourceNotFoundException("Child ${request.childId} was not found")
         if (sleepRepository.existsOpenForChild(request.childId)) {
             throw DomainConflictException("Child ${request.childId} already has an open sleep event")
         }
@@ -62,7 +65,7 @@ class BabyEventService(
         val now = clock.instant()
         return sleepRepository.save(
             SleepEventEntity(
-                child = findChild(request.childId),
+                child = child,
                 startedAt = request.startedAt ?: now,
                 memo = request.memo?.trim()?.takeIf(String::isNotEmpty),
                 createdByUserId = request.createdByUserId,
@@ -73,8 +76,8 @@ class BabyEventService(
 
     @Transactional
     fun endSleep(sleepId: UUID, request: EndSleepRequest?): SleepResponse {
-        val event = sleepRepository.findById(sleepId)
-            .orElseThrow { ResourceNotFoundException("Sleep event $sleepId was not found") }
+        val event = sleepRepository.findForUpdate(sleepId)
+            ?: throw ResourceNotFoundException("Sleep event $sleepId was not found")
         if (event.endedAt != null) {
             throw DomainConflictException("Sleep event $sleepId has already ended")
         }
@@ -91,4 +94,3 @@ class BabyEventService(
         childRepository.findById(childId)
             .orElseThrow { ResourceNotFoundException("Child $childId was not found") }
 }
-

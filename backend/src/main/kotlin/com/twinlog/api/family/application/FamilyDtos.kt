@@ -3,6 +3,7 @@ package com.twinlog.api.family.application
 import com.twinlog.api.family.domain.ChildEntity
 import com.twinlog.api.family.domain.FamilyEntity
 import jakarta.validation.constraints.Min
+import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import java.time.Instant
@@ -14,6 +15,15 @@ data class CreateFamilyRequest(
     @field:Size(max = 100)
     val name: String,
 )
+
+data class SetupFamilyRequest(
+    @field:NotBlank @field:Size(max = 100)
+    val name: String,
+    @field:Valid @field:Size(min = 1, max = 8)
+    val children: List<CreateChildRequest>,
+)
+
+data class SetupFamilyResponse(val family: FamilyResponse, val children: List<ChildResponse>)
 
 data class FamilyResponse(
     val id: UUID,
@@ -57,4 +67,3 @@ fun ChildEntity.toResponse() = ChildResponse(
     birthDate = birthDate,
     createdAt = createdAt,
 )
-

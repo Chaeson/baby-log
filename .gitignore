@@ -9,4 +9,6 @@ backend/.gradle/
 backend/build/
 backend/out/
 backend/.env
-
+backend/.env.*
+!backend/.env.example
+infra/aws/*.local.yml

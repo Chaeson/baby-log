@@ -180,7 +180,7 @@ export function VoiceSheet({ onClose }: VoiceSheetProps) {
         <header className="flex items-start justify-between gap-4">
           <div>
             <p className="mb-1 text-xs font-extrabold tracking-[0.12em] text-sage-deep">
-              BACKEND SPEECH-TO-TEXT
+              VOICE NOTE
             </p>
             <h2 id="voice-title" className="font-display text-2xl leading-tight text-ink">
               말로 육아 기록하기
@@ -232,7 +232,7 @@ export function VoiceSheet({ onClose }: VoiceSheetProps) {
             ) : status === "transcribing" ? (
               <>
                 <p className="font-extrabold">말을 글로 바꾸고 있어요</p>
-                <p className="mt-1 text-xs text-ink-muted">녹음은 안전하게 Backend로 전송됩니다.</p>
+                <p className="mt-1 text-xs text-ink-muted">인식이 끝나면 문장을 확인할 수 있어요.</p>
               </>
             ) : transcript ? (
               <div className="text-left">
@@ -241,7 +241,7 @@ export function VoiceSheet({ onClose }: VoiceSheetProps) {
                 </p>
                 <p className="mt-1.5 text-base font-bold leading-6">{transcript}</p>
                 <p className="mt-2 text-xs text-ink-muted">
-                  아직 육아 기록에는 반영되지 않았어요. 다음 단계에서 확인 후 저장을 연결합니다.
+                  현재는 음성 인식만 지원해요. 육아 기록에는 아직 저장되지 않았으며 아이별 빠른 기록으로 입력할 수 있어요.
                 </p>
               </div>
             ) : (
@@ -267,7 +267,7 @@ export function VoiceSheet({ onClose }: VoiceSheetProps) {
         <div className="mt-4 flex items-start gap-3 rounded-2xl border border-line bg-canvas/70 p-3.5">
           <ShieldCheck className="mt-0.5 size-5 shrink-0 text-sage-deep" aria-hidden="true" />
           <p className="text-xs leading-5 text-ink-muted">
-            OpenAI API Key는 Spring Backend에만 보관합니다. 브라우저에는 노출되지 않습니다.
+            녹음은 음성 인식을 위해 전송되며 앱의 기록이나 파일로 보관하지 않아요.
           </p>
         </div>
 

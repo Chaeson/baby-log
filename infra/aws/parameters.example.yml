@@ -1,0 +1,35 @@
+# Copy to parameters.local.yml (gitignored). This is an AWS CLI create-change-set input.
+# Run from repo root; the guide supplies --template-body separately.
+# TODO: replace every REPLACE_* value. Never put passwords/API keys in this file.
+# CREATE for the first stack; UPDATE for later deployments, with a new ChangeSetName.
+StackName: twinlog-pilot
+ChangeSetName: REPLACE_RELEASE_ID
+ChangeSetType: CREATE
+Capabilities: [CAPABILITY_IAM]
+Parameters:
+  - ParameterKey: ImageUri
+    ParameterValue: REPLACE_ACCOUNT.dkr.ecr.ap-northeast-2.amazonaws.com/REPLACE_REPOSITORY:REPLACE_RELEASE_ID
+  - ParameterKey: RepositoryArn
+    ParameterValue: arn:aws:ecr:ap-northeast-2:REPLACE_ACCOUNT:repository/REPLACE_REPOSITORY
+  - ParameterKey: AuroraEngineVersion
+    ParameterValue: REPLACE_SUPPORTED_16_MINOR
+  - ParameterKey: CertificateArn
+    ParameterValue: arn:aws:acm:ap-northeast-2:REPLACE_ACCOUNT:certificate/REPLACE_CERTIFICATE_ID
+  - ParameterKey: ApiDomainName
+    ParameterValue: api.REPLACE_DOMAIN.com
+  - ParameterKey: WebAllowedOrigins
+    ParameterValue: https://REPLACE_WEB_DOMAIN.com
+  - ParameterKey: AllowedClientCidr
+    ParameterValue: REPLACE_OPERATOR_PUBLIC_IP/32
+  - ParameterKey: HostedZoneId
+    ParameterValue: '' # Optional public Route53 zone; otherwise set DNS manually.
+  - ParameterKey: TaskMemory
+    ParameterValue: '1024'
+  - ParameterKey: AuroraMaxAcu
+    ParameterValue: '1'
+  - ParameterKey: OpenAiSecretArn
+    ParameterValue: '' # Optional plaintext API-key secret, using AWS-managed key.
+  - ParameterKey: AppDatabaseSecretArn
+    ParameterValue: '' # Bootstrap only. Add pre-created least-privilege DB user before real data.
+  - ParameterKey: LogRetentionDays
+    ParameterValue: '7'

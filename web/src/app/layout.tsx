@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Gowun_Dodum, Noto_Sans_KR } from "next/font/google";
 import "./globals.css";
+import { WorkspaceProvider } from "@/components/workspace";
+import { Navigation } from "@/components/navigation";
 
 const notoSansKr = Noto_Sans_KR({
   variable: "--font-noto-sans-kr",
@@ -37,7 +39,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="ko"
       className={`${notoSansKr.variable} ${gowunDodum.variable}`}
     >
-      <body>{children}</body>
+      <body><WorkspaceProvider>{children}</WorkspaceProvider><Navigation /></body>
     </html>
   );
 }

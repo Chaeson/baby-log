@@ -1,0 +1,94 @@
+name: Backend and AWS configuration verification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'infra/aws/**'
+      - 'compose*.yml'
+      - '.github/workflows/backend-verify.yml'
+
+# Verification only: no AWS credentials, OIDC, image push or deployment.
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgres-and-api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: twinlog_test
+          POSTGRES_USER: twinlog_test
+          POSTGRES_PASSWORD: ci-test-only-password
+        ports:
+          - 15432:5432
+        options: >-
+          --health-cmd "pg_isready -U twinlog_test -d twinlog_test"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: H2 regression tests and production JAR
+        working-directory: backend
+        run: ./gradlew test bootJar --no-daemon
+      - name: Real PostgreSQL migration, persistence and concurrency tests
+        working-directory: backend
+        env:
+          PG_TEST_URL: jdbc:postgresql://127.0.0.1:15432/twinlog_test
+          PG_TEST_USERNAME: twinlog_test
+          PG_TEST_PASSWORD: ci-test-only-password
+        run: ./gradlew postgresTest --no-daemon
+      - name: Repeat against the same DB to verify restart and migration idempotency
+        working-directory: backend
+        env:
+          PG_TEST_URL: jdbc:postgresql://127.0.0.1:15432/twinlog_test
+          PG_TEST_USERNAME: twinlog_test
+          PG_TEST_PASSWORD: ci-test-only-password
+        run: ./gradlew postgresTest --no-daemon
+
+  infrastructure-and-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Check CloudFormation without contacting AWS
+        run: |
+          python -m pip install cfn-lint==1.46.0
+          cfn-lint --template infra/aws/ecr.yml infra/aws/stack.yml --regions ap-northeast-2
+          docker compose -f compose.yml config --quiet
+          docker compose -f compose.test.yml config --quiet
+      - uses: docker/setup-qemu-action@v4
+        with:
+          platforms: arm64
+      - uses: docker/setup-buildx-action@v4
+      - name: Build ARM64 runtime (never push)
+        uses: docker/build-push-action@v7
+        with:
+          context: ./backend
+          platforms: linux/arm64
+          push: false
+          load: true
+          tags: twinlog-backend:verify
+      - name: Check runtime tools and non-root user
+        run: |
+          docker run --rm --platform linux/arm64 --entrypoint sh twinlog-backend:verify -c \
+            'test "$(id -u)" = 10001 && test -r /app/certs/ap-northeast-2-bundle.pem && curl --version && java -version'

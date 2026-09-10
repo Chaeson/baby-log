@@ -31,6 +31,7 @@ type ChildCardProps = {
   onFeeding: (childId: string) => void;
   onDiaper: (childId: string, kind: DiaperKind) => void;
   onSleep: (childId: string) => void;
+  disabled?: boolean;
 };
 
 export function ChildCard({
@@ -39,6 +40,7 @@ export function ChildCard({
   onFeeding,
   onDiaper,
   onSleep,
+  disabled = false,
 }: ChildCardProps) {
   const accent = accentStyles[child.accent];
   const startedAt = child.sleep.startedAt
@@ -101,7 +103,7 @@ export function ChildCard({
         </div>
       </header>
 
-      <div className="grid grid-cols-4 gap-2" aria-label={`${child.name} 빠른 기록`}>
+      <fieldset disabled={disabled} className="grid grid-cols-4 gap-2 disabled:opacity-50" aria-label={`${child.name} 빠른 기록`}>
         <button
           type="button"
           className={actionClass}
@@ -144,7 +146,7 @@ export function ChildCard({
           )}
           {child.sleep.isSleeping ? "깨어남" : "잠들기"}
         </button>
-      </div>
+      </fieldset>
     </article>
   );
 }

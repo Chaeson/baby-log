@@ -1,0 +1,33 @@
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:4}
+      # Always-on Aurora: keep one connection ready; at most four per task.
+      minimum-idle: ${DB_POOL_MIN_IDLE:1}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:10000}
+      idle-timeout: ${DB_IDLE_TIMEOUT_MS:60000}
+      max-lifetime: ${DB_MAX_LIFETIME_MS:840000}
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  jpa:
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+twinlog:
+  web:
+    allowed-origins: ${WEB_ALLOWED_ORIGINS}
+
+server:
+  forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:none}
+  # Starting limits for the 0.25-vCPU / 1-GiB ECS task. Load-test before scaling.
+  tomcat:
+    threads:
+      max: ${HTTP_MAX_THREADS:16}
+      min-spare: ${HTTP_MIN_THREADS:2}
+    max-connections: ${HTTP_MAX_CONNECTIONS:64}
+    accept-count: ${HTTP_ACCEPT_COUNT:32}

@@ -7,10 +7,10 @@ Mobile browser
     │
     ▼
 Next.js App Router
-    ├─ Server page: 초기 데이터 로딩 경계
+    ├─ Server layout: metadata, font, viewport
     └─ Client feature: 빠른 기록, sheet, timer, 즉시 UI 반영
             │
-            ▼  다음 마일스톤
+            ▼
        typed REST client
             │
             ▼
@@ -20,19 +20,21 @@ Spring Controller ─ Application service ─ Domain/JPA model ─ Repository
                                                      PostgreSQL
 ```
 
-Dashboard route는 Server Component로 두고, 클릭·타이머·sheet처럼 브라우저 상태가 필요한 부분만 `DashboardShell` Client Component로 분리합니다. 이렇게 하면 현재 mock을 서버 조회로 바꿀 때 화면 전체를 클라이언트 전용으로 만들 필요가 없습니다.
+루트 layout은 Server Component이고 Dashboard route와 `WorkspaceProvider`는 브라우저 가족 연결 상태를 읽는 Client Component입니다. 기존 비교표·아이 카드·입력 sheet는 유지합니다.
 
-프론트엔드는 Backend 응답을 화면 모델로 변환하는 typed REST client를 둘 예정입니다. 컴포넌트가 URL이나 응답 DTO를 직접 알지 않게 하여 mock과 실제 API 전환 범위를 작게 유지합니다.
+`web/src/lib/api.ts`는 Backend DTO를 기존 Dashboard 화면 모델로 변환합니다. `WorkspaceProvider`가 가족 연결과 공통 서버 snapshot을 관리하며 `useRemote`는 날짜/기간이 바뀔 때 이전 조회를 취소하고 늦게 도착한 응답을 무시합니다.
 
 ## Web 상태 동기화
 
-현재 Dashboard의 빠른 기록은 로컬 state를 즉시 갱신하는 mock 동작입니다. Backend 연결 후에는 다음의 단순한 흐름으로 시작합니다.
+Dashboard의 빠른 기록은 다음의 흐름으로 서버 응답을 반영합니다.
 
 ```text
 사용자 기록 → POST event → GET today dashboard → 화면 교체
 ```
 
 엄마와 아빠가 동시에 기록하는 경우에도 재조회한 서버 값을 기준으로 맞춥니다. WebSocket/SSE와 복잡한 클라이언트 캐시는 실제 필요성이 확인된 뒤 도입합니다.
+
+화면 재집중 및 30초마다 활성 Dashboard를 새로고침합니다. 저장 중에는 중복 탭을 막으며 POST는 자동 재시도하지 않습니다. 저장 성공과 후속 조회 실패를 구분합니다. 수면 시작은 아이 행 잠금으로, 수면 종료는 기록 행 잠금으로 동시 요청을 직렬화합니다.
 
 ## Domain
 

@@ -1,6 +1,7 @@
 package com.twinlog.api.family.application
 
 import com.twinlog.api.common.DomainConflictException
+import com.twinlog.api.common.InvalidRequestException
 import com.twinlog.api.common.ResourceNotFoundException
 import com.twinlog.api.family.domain.ChildEntity
 import com.twinlog.api.family.domain.FamilyEntity
@@ -18,6 +19,18 @@ class FamilyService(
     private val clock: Clock,
 ) {
     @Transactional
+    fun setup(request: SetupFamilyRequest): SetupFamilyResponse {
+        if (request.children.map { it.birthOrder }.distinct().size != request.children.size) {
+            throw InvalidRequestException("Birth orders must be unique")
+        }
+        val family = createFamily(CreateFamilyRequest(request.name))
+        return SetupFamilyResponse(family, request.children.map { registerChild(family.id, it) })
+    }
+
+    @Transactional(readOnly = true)
+    fun getFamily(familyId: UUID): FamilyResponse = findFamily(familyId).toResponse()
+
+    @Transactional
     fun createFamily(request: CreateFamilyRequest): FamilyResponse =
         familyRepository.save(
             FamilyEntity(
@@ -28,7 +41,8 @@ class FamilyService(
 
     @Transactional
     fun registerChild(familyId: UUID, request: CreateChildRequest): ChildResponse {
-        val family = findFamily(familyId)
+        val family = familyRepository.findForUpdate(familyId)
+            ?: throw ResourceNotFoundException("Family $familyId was not found")
         if (childRepository.existsForFamilyAndBirthOrder(familyId, request.birthOrder)) {
             throw DomainConflictException("Birth order ${request.birthOrder} already exists in this family")
         }
@@ -56,4 +70,3 @@ class FamilyService(
         familyRepository.findById(familyId)
             .orElseThrow { ResourceNotFoundException("Family $familyId was not found") }
 }
-

@@ -1,7 +1,10 @@
+"use client";
+
 import { DashboardShell } from "@/features/dashboard/components/dashboard-shell";
-import { mockDashboard } from "@/features/dashboard/mock-data";
+import { useWorkspace } from "@/components/workspace";
+import { recordCare } from "@/lib/api";
 
 export default function DashboardPage() {
-  return <DashboardShell initialData={mockDashboard} />;
+  const { dashboard, refresh } = useWorkspace();
+  return <DashboardShell initialData={dashboard} onRecord={recordCare} onRefresh={refresh} />;
 }
-

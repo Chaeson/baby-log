@@ -1,6 +1,7 @@
 # TwinLog Web
 
-TwinLog의 모바일 우선 Next.js 클라이언트입니다. 현재 `/dashboard`는 Backend 연결 전 UI와 상호작용을 검증하기 위한 mock 단계입니다.
+모바일 우선 Next.js 클라이언트입니다. 오늘·기록·인사이트·설정은 실제 Backend REST API에 연결되어 있습니다.
+DB 없이 전체 흐름을 확인하는 실행 방법은 [DB_READINESS.md](../docs/DB_READINESS.md)에 있습니다.
 
 ## 실행과 검증
 
@@ -9,52 +10,36 @@ npm install
 npm run dev
 ```
 
-`http://localhost:3000`에서 Dashboard로 이동합니다.
+`NEXT_PUBLIC_API_BASE_URL` 기본값은 `http://127.0.0.1:8080`입니다.
+8081에 로컬 Backend를 실행했다면 해당 주소를 환경 변수로 지정합니다.
+이 값은 빌드 시 포함되는 공개 URL이며 API 키 같은 비밀 값은 Web에 넣지 않습니다.
 
 ```bash
 npm run lint
-npm test
 npm run test:coverage
-npm run build
+npm run build -- --webpack
 ```
 
-## 구조
+## 구조와 데이터 흐름
 
-```text
-src/
-├── app/
-│   ├── layout.tsx             # 전역 metadata, font, viewport
-│   ├── page.tsx               # /dashboard redirect
-│   └── dashboard/page.tsx     # Server Component 경계
-├── features/dashboard/
-│   ├── components/            # 비교표, 아이 카드, 입력 sheet
-│   ├── mock-data.ts           # 현재 마일스톤의 유일한 mock 원천
-│   └── __tests__/             # 주요 사용자 동작 테스트
-└── lib/
-    ├── dashboard.ts           # 화면 타입과 순수 format utility
-    └── voice-api.ts           # Backend multipart transcription client
-```
+- `components/workspace.tsx`: 가족/아이 일괄 등록, 가족 연결 기억, 서버 snapshot 공유
+- `components/navigation.tsx`: 오늘·기록·인사이트·AI·설정 페이지 링크
+- `lib/api.ts`: REST DTO, 화면 모델 변환, timeout/오류 처리
+- `lib/use-remote.ts`: 조회 취소와 오래된 응답 무시
+- `features/dashboard`: 기존 비교표/아이 카드/입력 sheet
+- `features/records`: 오늘/어제/날짜/7일/30일, 아이·기록 유형 필터
+- `features/insights`: 수유·수면·대소변·아이별 비교
+- `features/dashboard/mock-data.ts`: 테스트 fixture 전용
 
-App Router에서는 컴포넌트가 기본적으로 서버에서 렌더링됩니다. `dashboard/page.tsx`는 앞으로 Backend 초기 데이터를 읽을 서버 경계로 유지하고, `DashboardShell`에만 `"use client"`를 선언해 버튼, 타이머, localStorage 같은 브라우저 기능을 담당하게 했습니다.
+루트 layout은 서버 컴포넌트로 유지합니다. 브라우저의 가족 연결 상태를 읽는 Provider와 상호작용 화면은 클라이언트 컴포넌트입니다.
+빠른 기록은 POST 완료 후 Dashboard를 다시 조회합니다. 실패 시 mock으로 대체하지 않으며 POST를 자동 재시도하지 않습니다.
+진행 중 수면 시간이 이미 서버 합계에 포함되므로 화면에서 중복 합산하지 않습니다.
 
-Dashboard의 `children` 배열이 아이 수를 결정하므로 단태아와 다태아를 같은 컴포넌트로 처리합니다. 비교표는 첫째와 둘째가 각 지표에서 항상 같은 열에 오도록 table semantics를 사용합니다.
+localStorage에는 가족 ID만 저장합니다. 가족 ID 자체는 인증 수단이 아니며 로그인과 가족 구성원 권한 검사는 공개 전에 필요합니다.
 
-## 음성 녹음
+## 음성 및 AI
 
-`VoiceSheet`는 사용자가 녹음 시작을 누른 뒤에만 마이크 권한을 요청합니다. Chrome 계열의 `webm/opus`와 Safari 계열의 `mp4`를 우선순위에 따라 선택하고 30초 후 자동 종료합니다. 녹음을 마치면 `voice-api.ts`가 Spring Backend에 multipart로 전송하고 인식 문장을 표시합니다.
-
-```bash
-cp .env.example .env.local
-```
-
-`NEXT_PUBLIC_API_BASE_URL`은 공개 가능한 Backend base URL일 뿐 비밀 값이 아닙니다. OpenAI API Key는 Web 환경 변수에 넣지 않습니다.
-
-## 다음 연결 지점
-
-다음 마일스톤에서는 `features/dashboard`와 컴포넌트 사이에 typed REST client를 추가합니다.
-
-1. `GET /api/v1/families/{familyId}/dashboard/today`로 초기 화면을 로드합니다.
-2. 빠른 기록 버튼이 해당 event POST를 호출합니다.
-3. 성공 후 today Dashboard를 다시 조회해 여러 보호자의 기록과 동기화합니다.
-
-환경별 Backend URL은 공개 가능한 base URL만 환경 변수로 관리합니다. 비밀 키와 OpenAI 호출은 Web에 두지 않습니다.
+VoiceSheet는 사용자 동작으로 마이크 권한을 요청하고 최대 30초 녹음합니다.
+기존 Backend STT에 multipart로 전송해 인식 문장을 표시합니다.
+현재 음성 문장을 육아 기록으로 확정 저장하거나 AI 대화 응답을 생성하지 않습니다.
+AI 메뉴는 아이별/공통 모드와 미연결 안내를 제공합니다.

@@ -5,6 +5,8 @@ import com.twinlog.api.family.application.CreateChildRequest
 import com.twinlog.api.family.application.CreateFamilyRequest
 import com.twinlog.api.family.application.FamilyResponse
 import com.twinlog.api.family.application.FamilyService
+import com.twinlog.api.family.application.SetupFamilyRequest
+import com.twinlog.api.family.application.SetupFamilyResponse
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.GetMapping
@@ -21,6 +23,13 @@ import java.util.UUID
 class FamilyController(
     private val familyService: FamilyService,
 ) {
+    @PostMapping("/setup")
+    @ResponseStatus(HttpStatus.CREATED)
+    fun setup(@Valid @RequestBody request: SetupFamilyRequest): SetupFamilyResponse = familyService.setup(request)
+
+    @GetMapping("/{familyId}")
+    fun getFamily(@PathVariable familyId: UUID): FamilyResponse = familyService.getFamily(familyId)
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     fun createFamily(@Valid @RequestBody request: CreateFamilyRequest): FamilyResponse =
@@ -37,4 +46,3 @@ class FamilyController(
     fun getChildren(@PathVariable familyId: UUID): List<ChildResponse> =
         familyService.getChildren(familyId)
 }
-
