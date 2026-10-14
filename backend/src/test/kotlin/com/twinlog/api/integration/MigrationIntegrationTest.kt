@@ -16,6 +16,7 @@ class MigrationIntegrationTest(@Autowired private val jdbc: JdbcTemplate) {
     @Test
     fun `versioned schema is applied and validated without Hibernate creating tables`() {
         assertEquals(1, jdbc.queryForObject("select count(*) from flyway_schema_history where success = true and version = '1'", Int::class.java))
+        assertEquals(1, jdbc.queryForObject("select count(*) from flyway_schema_history where success = true and version = '2'", Int::class.java))
         assertEquals(0, jdbc.queryForObject("select count(*) from families", Int::class.java))
     }
 }

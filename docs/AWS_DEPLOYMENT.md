@@ -1,6 +1,6 @@
 # ECS + Aurora 배포 준비
 
-기존 Kotlin/Spring Boot API와 Flyway V1 스키마를 그대로 사용한다. 새 백엔드를 다시 만드는 작업이 아니다.
+기존 Kotlin/Spring Boot API와 Flyway V1 스키마를 유지하고 V2로 인증 연결·초대·멱등 저장 테이블을 추가한다. 최신 변경과 인증/Web 배포 순서는 [MVP_HANDOFF.md](MVP_HANDOFF.md)를 함께 참고한다.
 `infra/aws/stack.yml`은 **서울 리전의 IP 제한 파일럿 환경**이며 공개 서비스 출시 완료를 의미하지 않는다.
 이 저장소 변경만으로 AWS 리소스가 생성되지는 않는다. 실제 계정 적용·과금은 별도 승인 후 진행한다.
 
@@ -10,7 +10,7 @@
 |---|---|---|
 | ECS Fargate | ARM64, 0.25 vCPU, 1 GiB, On-Demand 태스크 1개 | 상시 실행, Spot/자동 중지 없음 |
 | Aurora PostgreSQL | 16 계열, Serverless v2 writer 1개, 0.5~1 ACU | 자동 정지 없음, 읽기 복제본 없음 |
-| 진입점 | HTTPS ALB, ACM 인증서, 운영자 IPv4 `/32` | 인증 미구현이므로 공개 접근 금지 |
+| 진입점 | HTTPS ALB, ACM 인증서, 운영자 IPv4 `/32` | 인증 코드 추가 후에도 실제 통합 검증까지 파일럿 제한 유지 |
 | 네트워크 | AZ 2개, public 앱 서브넷 + isolated DB 서브넷 | NAT Gateway·유료 VPC endpoint 없음 |
 | JVM / DB pool | heap 최대 55%, Serial GC, 연결 1~4개 | 1 GiB 시작점; 부하 검증 전 용량 보장 아님 |
 | 보존 | DB 백업 7일, 로그 7일, 삭제 방지·삭제 시 snapshot | 보존 데이터도 비용 발생 |

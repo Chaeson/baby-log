@@ -74,7 +74,8 @@ class DashboardService(
         val now = clock.instant()
         val today = now.atZone(zoneId).toLocalDate()
         val from = today.atStartOfDay(zoneId).toInstant()
-        val to = now.plusNanos(1)
+        // PostgreSQL timestamps have microsecond precision; 1 ns rounds back to now.
+        val to = now.truncatedTo(java.time.temporal.ChronoUnit.MICROS).plusNanos(1000)
         val children = familyService.getChildren(familyId)
 
         val feedingsByChild = feedingRepository.findAllForFamilyBetween(familyId, from, to)

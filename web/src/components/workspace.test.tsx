@@ -2,10 +2,10 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WorkspaceProvider, useWorkspace } from "./workspace";
-import { ApiError, FAMILY_STORAGE_KEY, loadWorkspace, setupFamily, recordCare } from "@/lib/api";
+import { ApiError, FAMILY_STORAGE_KEY, loadWorkspace, setupFamily, request } from "@/lib/api";
 import DashboardPage from "@/app/dashboard/page";
 import { mockDashboard } from "@/features/dashboard/mock-data";
-vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), loadWorkspace: vi.fn(), setupFamily: vi.fn(), recordCare: vi.fn() }));
+vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), loadWorkspace: vi.fn(), setupFamily: vi.fn(), request: vi.fn() }));
 const id = "12345678-1234-1234-1234-123456789012";
 const workspace = { family: { id, name: "연결된 가족" }, dashboard: mockDashboard };
 function Consumer() {
@@ -16,7 +16,7 @@ beforeEach(() => { localStorage.clear(); vi.mocked(loadWorkspace).mockReset().mo
 describe("family workspace", () => {
   it("updates both dashboard tables after saving and manually refreshing without navigation", async () => {
     localStorage.setItem(FAMILY_STORAGE_KEY, id);
-    vi.mocked(recordCare).mockResolvedValue({ id: "saved-event" });
+    vi.mocked(request).mockResolvedValue({ saved: true });
     render(<WorkspaceProvider><DashboardPage /></WorkspaceProvider>);
     await screen.findByRole("row", { name: "분유 620ml 580ml" });
     await waitFor(() => expect(loadWorkspace).toHaveBeenCalledTimes(2));

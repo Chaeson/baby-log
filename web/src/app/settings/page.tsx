@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useWorkspace } from "@/components/workspace";
 import { request } from "@/lib/api";
+import { authHeaders, logout } from "@/lib/auth";
 
 export default function SettingsPage() {
   const { family, dashboard, disconnect, refresh } = useWorkspace();
@@ -10,6 +11,7 @@ export default function SettingsPage() {
   const [order, setOrder] = useState(dashboard.children.length + 1);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [invite, setInvite] = useState("");
   async function addChild() {
     if (busy) return;
     setBusy(true); setMessage(null);
@@ -23,6 +25,10 @@ export default function SettingsPage() {
   }
   return <main className="page space-y-5">
     <h1 className="text-3xl font-bold">설정</h1>
+    {authHeaders().Authorization && <section className="panel space-y-3"><h2 className="font-bold">보호자 초대</h2><p className="text-sm">가족 소유자가 만든 코드는 24시간 동안 한 번 사용할 수 있어요. 초대받은 보호자는 로그인 후 코드를 입력하세요.</p><button className="action" disabled={busy} onClick={() => {
+      setBusy(true);
+      void request<{ token: string }>(`/families/${family.id}/invites`, { method: "POST" }).then(result => setInvite(result.token)).catch(error => setMessage(error.message)).finally(() => setBusy(false));
+    }}>초대 코드 만들기</button>{invite && <code className="block break-all select-all">{invite}</code>}<button className="action" onClick={logout}>로그아웃</button></section>}
     <section className="panel space-y-3"><h2 className="text-lg font-bold">{family.name}</h2>
       <p className="text-sm text-ink-muted">가족 ID</p><code className="block break-all text-sm select-all">{family.id}</code>
       <p className="text-sm text-ink-muted">이 브라우저는 가족 연결만 기억해요. 육아 기록은 서버에서 불러옵니다.</p>

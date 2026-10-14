@@ -23,6 +23,7 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     environment:
+      SPRING_PROFILES_ACTIVE: local-db
       DB_URL: jdbc:postgresql://postgres:5432/twinlog
       DB_USERNAME: twinlog
       DB_PASSWORD: local-twinlog-password

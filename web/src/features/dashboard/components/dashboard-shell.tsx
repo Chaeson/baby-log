@@ -10,14 +10,16 @@ import { ComparisonTable } from "./comparison-table";
 import { CurrentStatusSummary } from "./current-status-summary";
 import { FeedingSheet } from "./feeding-sheet";
 import { VoiceSheet } from "./voice-sheet";
+import { VoiceRecordForm } from "./voice-record-form";
 
 type DashboardShellProps = {
+  familyId?: string;
   initialData: DashboardSnapshot;
   onRecord: (command: CareCommand) => Promise<unknown>;
   onRefresh: () => Promise<void>;
 };
 
-export function DashboardShell({ initialData, onRecord, onRefresh }: DashboardShellProps) {
+export function DashboardShell({ initialData, onRecord, onRefresh, familyId }: DashboardShellProps) {
   const children = initialData.children;
   const [feedingChildId, setFeedingChildId] = useState<string | null>(null);
   const [voiceOpen, setVoiceOpen] = useState(false);
@@ -240,7 +242,7 @@ export function DashboardShell({ initialData, onRecord, onRefresh }: DashboardSh
           error={error}
         />
       ) : null}
-      {voiceOpen ? <VoiceSheet onClose={() => setVoiceOpen(false)} /> : null}
+      {voiceOpen ? <VoiceSheet onClose={() => setVoiceOpen(false)} renderRecord={familyId ? (text, onPending) => <VoiceRecordForm key={text} transcript={text} familyId={familyId} childSummaries={children} onSaved={onRefresh} onPending={onPending} /> : undefined} /> : null}
 
       <div
         aria-live="polite"

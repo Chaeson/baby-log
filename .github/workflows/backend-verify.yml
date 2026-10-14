@@ -73,7 +73,7 @@ jobs:
       - name: Check CloudFormation without contacting AWS
         run: |
           python -m pip install cfn-lint==1.46.0
-          cfn-lint --template infra/aws/ecr.yml infra/aws/stack.yml --regions ap-northeast-2
+          cfn-lint --template infra/aws/ecr.yml infra/aws/stack.yml infra/aws/auth.yml infra/aws/web.yml --regions ap-northeast-2
           docker compose -f compose.yml config --quiet
           docker compose -f compose.test.yml config --quiet
       - uses: docker/setup-qemu-action@v4

@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { ApiError, FAMILY_STORAGE_KEY, loadWorkspace, setupFamily, type Family } from "@/lib/api";
+import { ApiError, FAMILY_STORAGE_KEY, loadWorkspace, setupFamily, request, type Family } from "@/lib/api";
+import { authHeaders } from "@/lib/auth";
 import type { DashboardSnapshot } from "@/lib/dashboard";
 
 type Workspace = {
@@ -84,6 +85,7 @@ function Onboarding({ error, connect }: { error: string | null; connect: (id: st
   const [name, setName] = useState("우리 가족");
   const [names, setNames] = useState(["첫째", "둘째"]);
   const [existingId, setExistingId] = useState("");
+  const [invite, setInvite] = useState("");
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -108,9 +110,15 @@ function Onboarding({ error, connect }: { error: string | null; connect: (id: st
       <div className="flex flex-wrap gap-2"><button className="action" type="button" disabled={names.length >= 8 || busy} onClick={() => setNames([...names, ""])}>아이 추가</button><button className="action" type="button" disabled={names.length <= 1 || busy} onClick={() => setNames(names.slice(0, -1))}>마지막 아이 제외</button></div>
       <button className="action primary w-full" disabled={busy || !name.trim() || names.some((name) => !name.trim())}>{busy ? "연결 중…" : "가족 등록하고 시작"}</button>
     </form>
-    <form className="panel space-y-3" onSubmit={(event) => { event.preventDefault(); void submit(false); }}>
+    {authHeaders().Authorization ? <form className="panel space-y-3" onSubmit={event => {
+      event.preventDefault(); if (busyRef.current) return;
+      busyRef.current = true; setBusy(true); setLocalError(null);
+      void request<{ familyId: string }>("/invites/accept", { method: "POST", body: JSON.stringify({ token: invite.trim() }) })
+        .then(result => connect(result.familyId)).catch(error => setLocalError(error.message))
+        .finally(() => { busyRef.current = false; setBusy(false); });
+    }}><label className="block">보호자 초대 코드<input className="field mt-2" required value={invite} onChange={e => setInvite(e.target.value)} /></label><button className="action w-full" disabled={busy}>초대 수락</button></form> : <form className="panel space-y-3" onSubmit={(event) => { event.preventDefault(); void submit(false); }}>
       <h2 className="font-bold">등록한 가족이 있나요?</h2><label className="block text-sm">가족 ID<input className="field mt-2" value={existingId} required pattern="[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}" onChange={(e) => setExistingId(e.target.value)} /></label>
       <button className="action w-full" disabled={busy}>기존 가족 연결</button>
-    </form>
+    </form>}
   </main>;
 }

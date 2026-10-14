@@ -3,6 +3,7 @@ import { Gowun_Dodum, Noto_Sans_KR } from "next/font/google";
 import "./globals.css";
 import { WorkspaceProvider } from "@/components/workspace";
 import { Navigation } from "@/components/navigation";
+import { AuthGate } from "@/components/auth-gate";
 
 const notoSansKr = Noto_Sans_KR({
   variable: "--font-noto-sans-kr",
@@ -39,7 +40,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="ko"
       className={`${notoSansKr.variable} ${gowunDodum.variable}`}
     >
-      <body><WorkspaceProvider>{children}</WorkspaceProvider><Navigation /></body>
+      <body><AuthGate><WorkspaceProvider>{children}</WorkspaceProvider><Navigation /></AuthGate></body>
     </html>
   );
 }

@@ -34,6 +34,8 @@ repositories {
 }
 
 dependencies {
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
+    testImplementation("org.springframework.security:spring-security-test")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
@@ -73,6 +75,7 @@ tasks.register<Test>("postgresTest") {
         includeTestsMatching("com.twinlog.api.integration.WorkspaceIntegrationTest")
         includeTestsMatching("com.twinlog.api.integration.MvpFlowIntegrationTest")
         includeTestsMatching("com.twinlog.api.integration.EventTimelineApiIntegrationTest")
+        includeTestsMatching("com.twinlog.api.integration.CareBatchIntegrationTest")
     }
     // The external database can change without Gradle inputs changing.
     outputs.upToDateWhen { false }

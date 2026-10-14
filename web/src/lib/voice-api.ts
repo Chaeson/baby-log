@@ -1,3 +1,5 @@
+import { authHeaders } from "./auth";
+
 export type TranscriptionResponse = {
   text: string;
   model: string;
@@ -16,6 +18,7 @@ export async function transcribeAudio(
 
   const response = await fetch(`${API_BASE_URL}/api/v1/voice/transcriptions`, {
     method: "POST",
+    headers: authHeaders(),
     body: formData,
     signal,
   });

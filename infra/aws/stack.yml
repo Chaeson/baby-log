@@ -4,6 +4,14 @@ Description: TwinLog Seoul restricted pilot - ECS Fargate ARM64 and always-on Au
 # TODO(public release): implement authentication, family authorization and rate limits.
 # Until then, HTTPS access is restricted to one operator IPv4 address.
 Parameters:
+  AuthIssuer:
+    Type: String
+    Description: AuthIssuer output from auth.yml
+    AllowedPattern: 'https://cognito-idp\.ap-northeast-2\.amazonaws\.com/.+'
+  AuthClientId:
+    Type: String
+    Description: AuthClientId output from auth.yml
+    MinLength: 1
   ImageUri:
     Type: String
     Description: 'REQUIRED: same-account Seoul ECR image URI with immutable release tag (not latest).'
@@ -338,6 +346,10 @@ Resources:
             - ContainerPort: 8080
               Protocol: tcp
           Environment:
+            - Name: AUTH_ISSUER
+              Value: !Ref AuthIssuer
+            - Name: AUTH_CLIENT_ID
+              Value: !Ref AuthClientId
             - Name: SPRING_PROFILES_ACTIVE
               Value: prod
             - Name: DB_URL

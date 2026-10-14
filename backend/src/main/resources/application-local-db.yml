@@ -1,0 +1,4 @@
+# Persistent PostgreSQL development only; never activate this profile on ECS.
+twinlog:
+  auth:
+    enabled: false

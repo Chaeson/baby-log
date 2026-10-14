@@ -70,6 +70,8 @@ class ChildEntity(
 @Entity
 @Table(name = "users")
 class UserEntity(
+    @Column(name = "auth_subject", unique = true)
+    val authSubject: UUID? = null,
     @Column(nullable = false, unique = true, length = 320)
     val email: String,
     @Column(name = "display_name", nullable = false, length = 100)
@@ -108,4 +110,3 @@ class FamilyMemberEntity(
     @GeneratedValue(strategy = GenerationType.UUID)
     var id: UUID? = null,
 )
-

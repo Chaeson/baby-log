@@ -1,0 +1,62 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: TwinLog Cognito email sign-in with authorization code and PKCE public client.
+Parameters:
+  WebCallbackUrl:
+    Type: String
+    Description: Exact HTTPS web callback, e.g. https://app.example.com/dashboard
+    AllowedPattern: 'https://.+'
+  DomainPrefix:
+    Type: String
+    Description: Globally unique Cognito hosted domain prefix
+    AllowedPattern: '[a-z0-9-]+'
+Resources:
+  Pool:
+    Type: AWS::Cognito::UserPool
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      UsernameAttributes: [email]
+      AutoVerifiedAttributes: [email]
+      UsernameConfiguration:
+        CaseSensitive: false
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireUppercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+  Client:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref Pool
+      GenerateSecret: false
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows: [code]
+      AllowedOAuthScopes: [openid, email]
+      SupportedIdentityProviders: [COGNITO]
+      CallbackURLs: [!Ref WebCallbackUrl]
+      LogoutURLs: [!Ref WebCallbackUrl]
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+  Domain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Ref DomainPrefix
+      UserPoolId: !Ref Pool
+Outputs:
+  AuthIssuer:
+    Value: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${Pool}'
+  AuthClientId:
+    Value: !Ref Client
+  AuthDomain:
+    Value: !Sub 'https://${DomainPrefix}.auth.${AWS::Region}.amazoncognito.com'

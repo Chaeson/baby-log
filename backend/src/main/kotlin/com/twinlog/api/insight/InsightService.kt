@@ -67,7 +67,8 @@ class InsightService(
         val from = to.minusDays(days.toLong() - 1)
         val fromInstant = from.atStartOfDay(zone).toInstant()
         val children = familyService.getChildren(familyId)
-        val events = timelineService.getTimeline(familyId, fromInstant, now.plusNanos(1), null, null).events
+        val throughNow = now.truncatedTo(java.time.temporal.ChronoUnit.MICROS).plusNanos(1000)
+        val events = timelineService.getTimeline(familyId, fromInstant, throughNow, null, null).events
         val byChild = events.groupBy { it.childId }
 
         return InsightResponse(familyId, from, to, zone.id, now, children.map { child ->

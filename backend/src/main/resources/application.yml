@@ -20,6 +20,10 @@ spring:
       max-request-size: 11MB
 
 twinlog:
+  auth:
+    enabled: true
+    issuer: ${AUTH_ISSUER:}
+    client-id: ${AUTH_CLIENT_ID:}
   openai:
     api-key: ${OPENAI_API_KEY:}
     base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}

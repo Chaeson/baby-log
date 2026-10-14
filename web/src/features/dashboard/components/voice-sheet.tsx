@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Check,
   LoaderCircle,
@@ -24,10 +24,12 @@ type RecorderStatus = "idle" | "requesting" | "recording" | "transcribing" | "su
 
 type VoiceSheetProps = {
   onClose: () => void;
+  renderRecord?: (transcript: string, onPending: (pending: boolean) => void) => ReactNode;
 };
 
-export function VoiceSheet({ onClose }: VoiceSheetProps) {
+export function VoiceSheet({ onClose, renderRecord }: VoiceSheetProps) {
   const [status, setStatus] = useState<RecorderStatus>("idle");
+  const [savePending, setSavePending] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [transcript, setTranscript] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -168,13 +170,14 @@ export function VoiceSheet({ onClose }: VoiceSheetProps) {
         type="button"
         className="absolute inset-0 cursor-default"
         onClick={onClose}
+        disabled={savePending}
         aria-label="음성 기록 닫기"
       />
       <dialog
         open
         aria-modal="true"
         aria-labelledby="voice-title"
-        className="sheet-enter safe-bottom relative m-0 w-full max-w-lg rounded-t-[2rem] border-0 bg-surface p-5 text-ink surface-shadow sm:rounded-[2rem]"
+        className="sheet-enter safe-bottom relative m-0 max-h-[90dvh] overflow-y-auto w-full max-w-lg rounded-t-[2rem] border-0 bg-surface p-5 text-ink surface-shadow sm:rounded-[2rem]"
       >
         <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-line sm:hidden" />
         <header className="flex items-start justify-between gap-4">
@@ -192,6 +195,7 @@ export function VoiceSheet({ onClose }: VoiceSheetProps) {
           <button
             type="button"
             onClick={onClose}
+            disabled={savePending}
             className="grid size-10 place-items-center rounded-full bg-canvas text-ink-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage"
             aria-label="닫기"
           >
@@ -241,7 +245,7 @@ export function VoiceSheet({ onClose }: VoiceSheetProps) {
                 </p>
                 <p className="mt-1.5 text-base font-bold leading-6">{transcript}</p>
                 <p className="mt-2 text-xs text-ink-muted">
-                  현재는 음성 인식만 지원해요. 육아 기록에는 아직 저장되지 않았으며 아이별 빠른 기록으로 입력할 수 있어요.
+                  {renderRecord ? "내용을 확인한 뒤 기록하기를 눌러 주세요." : "현재는 음성 인식만 지원해요. 육아 기록에는 아직 저장되지 않았으며 아이별 빠른 기록으로 입력할 수 있어요."}
                 </p>
               </div>
             ) : (
@@ -264,6 +268,8 @@ export function VoiceSheet({ onClose }: VoiceSheetProps) {
           </p>
         ) : null}
 
+        {transcript && renderRecord?.(transcript, setSavePending)}
+
         <div className="mt-4 flex items-start gap-3 rounded-2xl border border-line bg-canvas/70 p-3.5">
           <ShieldCheck className="mt-0.5 size-5 shrink-0 text-sage-deep" aria-hidden="true" />
           <p className="text-xs leading-5 text-ink-muted">
@@ -284,7 +290,7 @@ export function VoiceSheet({ onClose }: VoiceSheetProps) {
         ) : (
           <button
             type="button"
-            disabled={isBusy}
+            disabled={isBusy || savePending}
             onClick={startRecording}
             className="mt-4 flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-ink font-extrabold text-surface transition enabled:active:scale-[0.99] disabled:cursor-wait disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage focus-visible:ring-offset-2"
             aria-label={transcript || errorMessage ? "다시 녹음" : "녹음 시작"}

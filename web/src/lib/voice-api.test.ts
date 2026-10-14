@@ -20,7 +20,8 @@ describe("transcribeAudio", () => {
       expect.objectContaining({ method: "POST", body: expect.any(FormData) }),
     );
     const request = fetchMock.mock.calls[0][1] as RequestInit;
-    expect(request.headers).toBeUndefined();
+    expect(new Headers(request.headers).has("Content-Type")).toBe(false);
+    expect(new Headers(request.headers).has("Authorization")).toBe(false);
   });
 
   it("surfaces safe Problem Details from the backend", async () => {

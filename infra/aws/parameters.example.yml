@@ -7,6 +7,10 @@ ChangeSetName: REPLACE_RELEASE_ID
 ChangeSetType: CREATE
 Capabilities: [CAPABILITY_IAM]
 Parameters:
+  - ParameterKey: AuthIssuer
+    ParameterValue: https://cognito-idp.ap-northeast-2.amazonaws.com/REPLACE_USER_POOL_ID
+  - ParameterKey: AuthClientId
+    ParameterValue: REPLACE_COGNITO_CLIENT_ID
   - ParameterKey: ImageUri
     ParameterValue: REPLACE_ACCOUNT.dkr.ecr.ap-northeast-2.amazonaws.com/REPLACE_REPOSITORY:REPLACE_RELEASE_ID
   - ParameterKey: RepositoryArn

@@ -1,4 +1,5 @@
 import type { ChildAccent, DashboardSnapshot } from "./dashboard";
+import { authHeaders } from "./auth";
 
 export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8080").replace(/\/$/, "");
 export const FAMILY_STORAGE_KEY = "twinlog:family:v1";
@@ -17,12 +18,15 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
   try {
     const response = await fetch(`${API_BASE_URL}/api/v1${path}`, {
       ...init,
-      headers: { ...(init.body ? { "Content-Type": "application/json" } : {}), ...init.headers },
+      headers: { ...(init.body ? { "Content-Type": "application/json" } : {}), ...authHeaders(), ...init.headers },
       cache: "no-store",
       signal: controller.signal,
     });
     if (!response.ok) {
       const messages: Record<number, string> = {
+        401: "로그인이 만료됐어요. 새로고침 후 다시 로그인해 주세요.",
+        403: "이 가족의 기록에 접근할 권한이 없어요.",
+        429: "요청이 많아요. 잠시 후 다시 시도해 주세요.",
         400: "입력 내용과 날짜 범위를 확인해 주세요.",
         404: "가족 또는 기록을 찾지 못했어요. 가족 연결을 확인해 주세요.",
         409: "다른 보호자가 상태를 변경했을 수 있어요. 새로고침 후 확인해 주세요.",

@@ -14,3 +14,7 @@ spring:
     problemdetails:
       enabled: true
 
+twinlog:
+  test-mode: true
+  auth:
+    enabled: false

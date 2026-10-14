@@ -17,6 +17,7 @@ import java.util.UUID
 
 @Service
 class BabyEventService(
+    private val access: com.twinlog.api.auth.FamilyAccess,
     private val childRepository: ChildJpaRepository,
     private val feedingRepository: FeedingEventJpaRepository,
     private val diaperRepository: DiaperEventJpaRepository,
@@ -32,7 +33,7 @@ class BabyEventService(
                 occurredAt = request.occurredAt ?: now,
                 amountMl = request.amountMl,
                 memo = request.memo?.trim()?.takeIf(String::isNotEmpty),
-                createdByUserId = request.createdByUserId,
+                createdByUserId = access.userId(),
                 createdAt = now,
             ),
         ).toResponse()
@@ -47,7 +48,7 @@ class BabyEventService(
                 occurredAt = request.occurredAt ?: now,
                 diaperType = request.diaperType,
                 memo = request.memo?.trim()?.takeIf(String::isNotEmpty),
-                createdByUserId = request.createdByUserId,
+                createdByUserId = access.userId(),
                 createdAt = now,
             ),
         ).toResponse()
@@ -55,6 +56,7 @@ class BabyEventService(
 
     @Transactional
     fun startSleep(request: StartSleepRequest): SleepResponse {
+        findChild(request.childId)
         // Lock the child even when no sleep exists, serializing simultaneous starts.
         val child = childRepository.findForUpdate(request.childId)
             ?: throw ResourceNotFoundException("Child ${request.childId} was not found")
@@ -68,7 +70,7 @@ class BabyEventService(
                 child = child,
                 startedAt = request.startedAt ?: now,
                 memo = request.memo?.trim()?.takeIf(String::isNotEmpty),
-                createdByUserId = request.createdByUserId,
+                createdByUserId = access.userId(),
                 createdAt = now,
             ),
         ).toResponse()
@@ -78,6 +80,7 @@ class BabyEventService(
     fun endSleep(sleepId: UUID, request: EndSleepRequest?): SleepResponse {
         val event = sleepRepository.findForUpdate(sleepId)
             ?: throw ResourceNotFoundException("Sleep event $sleepId was not found")
+        access.requireMember(requireNotNull(event.child.family.id))
         if (event.endedAt != null) {
             throw DomainConflictException("Sleep event $sleepId has already ended")
         }
@@ -90,7 +93,10 @@ class BabyEventService(
         return event.toResponse()
     }
 
-    private fun findChild(childId: UUID): ChildEntity =
-        childRepository.findById(childId)
+    private fun findChild(childId: UUID): ChildEntity {
+        val child = childRepository.findById(childId)
             .orElseThrow { ResourceNotFoundException("Child $childId was not found") }
+        access.requireMember(requireNotNull(child.family.id))
+        return child
+    }
 }
